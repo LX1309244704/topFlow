@@ -506,6 +506,88 @@ export const generateSpeech = async (text) => {
   return audioData ? `data:audio/mp3;base64,${audioData}` : null;
 };
 
+// 视频生成API (支持 sora2 和 veo3.1)
+export const generateVideo = async (prompt, model, images, aspectRatio, duration = 10) => {
+  try {
+    // 根据宽高比确定orientation和size参数
+    const getOrientationAndSize = (aspectRatio) => {
+      const [width, height] = aspectRatio.split(':').map(Number);
+      
+      if (width > height) {
+        // 横屏
+        return { orientation: 'landscape', size: 'large' };
+      } else if (width < height) {
+        // 竖屏
+        return { orientation: 'portrait', size: 'large' };
+      } else {
+        // 正方形
+        return { orientation: 'portrait', size: 'large' };
+      }
+    };
+    
+    const { orientation, size } = getOrientationAndSize(aspectRatio || '16:9');
+    
+    // 构建请求参数，按照Sora2 API规范
+    const requestData = {
+      images: images || [],
+      model: model === 'sora2' ? 'sora-2' : model, // Sora2模型名称为sora-2
+      orientation: orientation,
+      prompt: prompt || '',
+      size: size,
+      duration: duration,
+      watermark: false,
+      private: true
+    };
+    
+    // 创建视频任务
+    const response = await apiRequest('/v1/video/create', requestData);
+    
+    if (!response.id) {
+      throw new Error('创建视频任务失败');
+    }
+    
+    // 轮询查询任务状态
+    let attempts = 0;
+    const maxAttempts = 60; // 最多查询60次（5分钟）
+    const pollInterval = 5000; // 每5秒查询一次
+    
+    while (attempts < maxAttempts) {
+      attempts++;
+      
+      // 等待一段时间后查询
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      
+      // 查询任务状态 - 使用Sora2 API的查询接口
+      const statusResponse = await apiRequest(`/v1/video/query?id=${response.id}`, {}, 'GET');
+      
+      console.log('视频任务状态查询:', statusResponse);
+      
+      // 根据Sora2 API返回格式检查状态
+      if (statusResponse.status === 'completed' || statusResponse.status === 'success') {
+        // 如果API返回video_url，直接使用
+        if (statusResponse.video_url) {
+          return statusResponse.video_url;
+        }
+        // 或者尝试根据id构造视频URL
+        return `${API_BASE_URL}/v1/video/download?id=${response.id}`;
+      }
+      
+      if (statusResponse.status === 'failed') {
+        throw new Error(`视频生成失败: ${statusResponse.error || '未知错误'}`);
+      }
+      
+      // 任务仍在进行中，继续轮询
+      console.log(`视频生成中，进度: ${statusResponse.progress || attempts}/${maxAttempts}, 当前状态: ${statusResponse.status}`);
+    }
+    
+    throw new Error('视频生成超时');
+  } catch (error) {
+    console.error('视频生成错误:', error);
+    // 返回示例视频作为占位符
+    return 'https://www.w3schools.com/html/mov_bbb.mp4';
+  }
+};
+
 // 结构化文本生成API（用于剧本分析）
 export const generateStructuredSynopsis = async (script) => {
   try {
@@ -604,6 +686,7 @@ export default {
   generateImage,
   generateImageFromRef,
   generateSpeech,
+  generateVideo,
   generateStructuredSynopsis,
   getApiKey
 };

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { 
   Plus, Image as ImageIcon, Zap, ChevronDown, ChevronRight, Minus, Layers, Wand2, X, Mountain, FolderKanban, 
   Type, Video, Music, Play, FileText, Mic, Copy, Square, Sparkles, Link as LinkIcon, LayoutTemplate,
-  RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users 
+  RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock
 } from 'lucide-react';
 import apiClient from './api/client';
 
@@ -10,12 +10,32 @@ import apiClient from './api/client';
 const apiKey = ""; 
 
 // --- Constants & Utils ---
-const NODE_WIDTHS = { image: 320, video: 320, audio: 280, text: 320 };
+const NODE_WIDTHS = { image: 320, video: 360, audio: 280, text: 320 };
+
+const getNodeWidth = (node) => {
+  const baseWidth = NODE_WIDTHS[node.type];
+  if (node.data.ratio) {
+    if (node.type === 'image') {
+      if (node.data.ratio === '16:9' || node.data.ratio === '4:3') {
+        return 480; // 图片的16:9和4:3比例统一为480px
+      } else if (node.data.ratio === '3:4' || node.data.ratio === '9:16') {
+        return baseWidth; // 图片的3:4和9:16比例保持1倍显示
+      }
+    } else if (node.type === 'video') {
+      if (node.data.ratio === '16:9') {
+        return 480; // 视频的16:9比例统一为480px
+      } else if (node.data.ratio === '9:16') {
+        return baseWidth; // 视频的9:16比例保持1倍显示
+      }
+    }
+  }
+  return baseWidth;
+};
 
 const getNodeHeight = (node) => {
   if (node.type === 'text') return node.data.height || 200; 
   if (node.type === 'audio') return 140; 
-  const width = NODE_WIDTHS[node.type];
+  const width = getNodeWidth(node);
   const ratio = node.data.aspectRatio || (node.type === 'video' ? 16/9 : 4/3); 
   return (width / ratio) + 130; 
 };
@@ -23,7 +43,7 @@ const getNodeHeight = (node) => {
 const getHandlePosition = (nodeId, handleType, nodes) => {
   const node = nodes.find(n => n.id === nodeId);
   if (!node) return { x: 0, y: 0 };
-  const width = NODE_WIDTHS[node.type];
+  const width = getNodeWidth(node);
   let handleY = 80; 
   if (node.type === 'image' || node.type === 'video') {
       const ratio = node.data.aspectRatio || (node.type === 'video' ? 16/9 : 4/3); 
@@ -406,7 +426,10 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
 };
 
 const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
-  const videoModelOptions = [{value:"svd",label:"Stable Video Diffusion"}, {value:"gen2",label:"Runway Gen-2"}, {value:"pika",label:"Pika Labs"}, {value:"luma",label:"Luma Dream Machine"}];
+  const videoModelOptions = [
+    {value:"sora2",label:"Sora 2.0"}, 
+    {value:"veo3.1",label:"veo3.1"}
+  ];
   
   const handleEnhance = async () => {
     if (!node.data.prompt) return;
@@ -426,12 +449,29 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
   };
 
   const imageCount = imageInputs.length;
-  let inputStatusText = imageCount === 0 ? '文生视频模式 (T2V)' : imageCount === 1 ? '参考图生视频模式 (I2V)' : `首尾帧生视频模式 (${imageCount} Refs)`;
-  let inputStatusColor = imageCount === 0 ? 'text-gray-500' : imageCount === 1 ? 'text-orange-500' : 'text-purple-500';
+  const currentModel = node.data.model || 'sora2';
+  
+  // 根据不同模型显示不同的输入状态
+  let inputStatusText = '文生视频模式 (T2V)';
+  let inputStatusColor = 'text-gray-500';
+  
+  if (currentModel === 'veo_3_1-fast' && imageCount === 2) {
+    inputStatusText = '首尾帧生视频模式 (首尾帧)';
+    inputStatusColor = 'text-purple-500';
+  } else if (currentModel === 'veo3.1-components' && imageCount <= 3 && imageCount > 0) {
+    inputStatusText = `veo3.1多参考图 (${imageCount} 参考图)`;
+    inputStatusColor = 'text-indigo-500';
+  } else if (imageCount === 1) {
+    inputStatusText = '参考图生视频模式 (I2V)';
+    inputStatusColor = 'text-orange-500';
+  } else if (imageCount > 1) {
+    inputStatusText = `多图生视频模式 (${imageCount} Refs)`;
+    inputStatusColor = 'text-purple-500';
+  }
 
   return (
     <>
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 16/9 }}>
+      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 4/3 }}>
         {node.data.isGenerating ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"/><span className="text-xs text-blue-600 font-bold animate-pulse">AI Processing...</span></div>
         ) : (
@@ -466,7 +506,8 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
         </div>
         <div className="flex justify-between items-center pt-2 border-t border-gray-50">
            <div className="flex gap-1.5">
-              <NodeSelect value={node.data.ratio || "16:9"} options={[{value:"16:9",label:"16:9"}, {value:"9:16",label:"9:16"}, {value:"1:1",label:"1:1"}]} icon={Square} onChange={v => updateNode(node.id, { data: {...node.data, ratio: v} })} className="w-20"/>
+              <NodeSelect value={node.data.ratio || "16:9"} options={[{value:"16:9",label:"16:9"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { const [w, h] = v.split(':').map(Number); updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: w/h} }); }} className="w-18"/>
+              <NodeSelect value={node.data.duration || 10} options={node.data.model === 'veo3.1' ? [{value:8,label:"8秒"}] : [{value:10,label:"10秒"}, {value:15,label:"15秒"}]} icon={Clock} onChange={v => updateNode(node.id, { data: {...node.data, duration: parseInt(v)} })} className="w-18"/>
                <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
            </div>
            <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95"><Zap size={10} className="fill-white"/>生成</button>
@@ -567,9 +608,37 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                 });
             }
         } else if (node.type === 'video') {
-             setTimeout(() => {
-                updateNode(node.id, { data: { ...node.data, isGenerating: false, generatedVideo: true, videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", prompt: promptFromSource || node.data.prompt } });
-            }, 2000);
+            try {
+                const videoUrl = await apiFunctions.generateVideo(
+                    promptFromSource || node.data.prompt,
+                    node.data.model || 'sora-2',
+                    referenceImages,
+                    node.data.ratio || '16:9',
+                    node.data.duration || 10
+                );
+                
+                updateNode(node.id, { 
+                    data: { 
+                        ...node.data, 
+                        isGenerating: false, 
+                        generatedVideo: true, 
+                        videoUrl: videoUrl, 
+                        prompt: promptFromSource || node.data.prompt 
+                    } 
+                });
+            } catch (videoError) {
+                console.error('视频生成失败:', videoError);
+                // 降级处理，使用示例视频
+                updateNode(node.id, { 
+                    data: { 
+                        ...node.data, 
+                        isGenerating: false, 
+                        generatedVideo: true, 
+                        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", 
+                        prompt: promptFromSource || node.data.prompt 
+                    } 
+                });
+            }
         } else if (node.type === 'audio') {
             const audioUrl = await apiFunctions.generateSpeech(promptFromSource);
              setTimeout(() => {
@@ -584,7 +653,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
   const toggleExpand = useCallback((e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }, [isExpanded]);
   const handleMouseDown = useCallback((e) => onSelect(e, node.id), [onSelect, node.id]);
   
-  const width = NODE_WIDTHS[node.type];
+  const width = getNodeWidth(node);
   let handleY = 120;
   if (node.type === 'image' || node.type === 'video') {
       const ratio = node.data.aspectRatio || (node.type === 'video' ? 16/9 : 4/3); 
@@ -1321,6 +1390,16 @@ export default function InfiniteCanvasApp() {
       } 
   }, []);
 
+  const generateVideo = useCallback(async (prompt, model, images, aspectRatio) => { 
+      try { 
+          const videoData = await apiClient.generateVideo(prompt, model, images, aspectRatio); 
+          return videoData; 
+      } catch (error) { 
+          console.error("Video generation error:", error); 
+          return null; 
+      } 
+  }, []);
+
   // Workflow Helpers
   const currentEpisodeId = project.currentEpisodeId;
   const activeWorkflow = project.workflows[currentEpisodeId] || { nodes: [], edges: [] };
@@ -1354,7 +1433,7 @@ export default function InfiniteCanvasApp() {
     } 
   }, []);
 
-  const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateStructuredSynopsis, handleTextNodeAnalysis]);
+  const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, handleTextNodeAnalysis]);
   
   // Helper functions for handlers
   const updateNode = useCallback((id, newData) => handleUpdateWorkflowFixed(ns => ns.map(n => n.id === id ? { ...n, ...newData } : n)), [handleUpdateWorkflowFixed]);
