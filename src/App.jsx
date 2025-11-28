@@ -5,6 +5,7 @@ import {
   RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock
 } from 'lucide-react';
 import apiClient from './api/client';
+import { createBatchNodes } from './utils/workflow';
 
 // --- Global API Key ---
 const apiKey = ""; 
@@ -497,9 +498,14 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
             <div className="flex items-center gap-2 text-xs"><LinkIcon size={12} className={inputStatusColor} /><span className={`font-semibold ${inputStatusColor}`}>{inputStatusText}</span></div>
             {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
         </div>
-        <div className="relative">
-            <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
-            <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors"><Wand2 size={14} /></button>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1">
+            <div className="relative">
+                <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
+                <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors"><Wand2 size={14} /></button>
+            </div>
+          </div>
+          <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-2 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 h-fit flex-shrink-0"><Zap size={12} className="fill-white"/>生成</button>
         </div>
         <div className="flex items-center gap-2 mt-1">
            <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1"/>
@@ -510,7 +516,6 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
               <NodeSelect value={node.data.duration || 10} options={node.data.model === 'veo3.1' ? [{value:8,label:"8秒"}] : [{value:10,label:"10秒"}, {value:15,label:"15秒"}]} icon={Clock} onChange={v => updateNode(node.id, { data: {...node.data, duration: parseInt(v)} })} className="w-18"/>
                <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
            </div>
-           <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95"><Zap size={10} className="fill-white"/>生成</button>
         </div>
       </div>
     </>
@@ -537,9 +542,11 @@ const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
     </div>
     <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[200px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
       {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
-      <textarea className="w-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0" placeholder="输入要朗读的文本..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, text: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
-      <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-         <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95"><Zap size={10} className="fill-white"/>生成音频</button>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1">
+          <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none" placeholder="输入要朗读的文本..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, text: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
+        </div>
+        <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-2 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 h-fit flex-shrink-0"><Zap size={12} className="fill-white"/>生成音频</button>
       </div>
     </div>
   </>
@@ -582,7 +589,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
     try {
         if (node.type === 'image') {
             let url;
-            if (referenceImage && isRefValid) url = await apiFunctions.generateImageFromRef(prompt, referenceImage);
+            if (referenceImage && isRefValid) url = await apiFunctions.generateImageFromRef(prompt, referenceImage, node.data.ratio);
             else url = await apiFunctions.generateImage(prompt, node.data.ratio); // Pass ratio
             
             if (url) {
@@ -667,7 +674,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
   const headerColor = { image: "text-blue-500", video: "text-blue-500", audio: "text-blue-500", text: "text-gray-500" }[node.type];
 
   return (
-    <div className={`absolute flex flex-col transition-shadow duration-200 ease-out group ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} onMouseDown={handleMouseDown}>
+    <div className={`absolute flex flex-col transition-shadow duration-200 ease-out group rounded-2xl ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} onMouseDown={handleMouseDown}>
       <HandlePoint type="target" top={handleY} onMouseUp={(e) => onConnectEnd(node.id, e)} />
       <HandlePoint type="source" top={handleY} onMouseDown={(e) => onConnectStart(node.id, e)} />
       <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100 z-[60]"><X size={12} /></button>
@@ -1369,10 +1376,10 @@ export default function InfiniteCanvasApp() {
       } 
   }, []);
 
-  const generateImageFromRef = useCallback(async (prompt, refImg) => { 
+  const generateImageFromRef = useCallback(async (prompt, refImg, ratio) => { 
       if (!refImg) return null; 
       try { 
-          const imageData = await apiClient.generateImageFromRef(prompt, refImg); 
+          const imageData = await apiClient.generateImageFromRef(prompt, refImg, ratio); 
           return imageData; 
       } catch (error) { 
           console.error("Image editing error:", error); 
@@ -1506,31 +1513,16 @@ export default function InfiniteCanvasApp() {
   const handleSpawnNodes = useCallback(async (sourceId, prompt, refImg) => {
     const srcNode = nodes.find(n => n.id === sourceId);
     if (!srcNode) return;
-    const count = srcNode.data.batchSize || 1;
-    const ratioStr = srcNode.data.ratio || (srcNode.type === 'video' ? "16:9" : "4:3");
-    const [w, h] = ratioStr.split(':').map(Number);
-    const targetAspectRatio = w / h;
-    const existing = nodes.filter(n => edges.some(e => e.source === sourceId && e.target === n.id));
-    let lowestY = srcNode.y;
-    if (existing.length) lowestY = existing.reduce((max, n) => Math.max(max, n.y + getNodeHeight(n)), srcNode.y);
     
-    let cx = srcNode.x + NODE_WIDTHS[srcNode.type] + 150, cy = lowestY + 50, maxH = 0;
-    const newNodes = [], newEdges = [];
-    for (let i = 0; i < count; i++) {
-        const nid = Date.now() + i;
-        if (i % 4 === 0 && i !== 0) { cy += maxH + 50; cx = srcNode.x + NODE_WIDTHS[srcNode.type] + 150; maxH = 0; }
-        newNodes.push({ id: nid, type: srcNode.type, x: cx, y: cy, data: { prompt: prompt || srcNode.data.prompt || "", ratio: ratioStr, aspectRatio: targetAspectRatio, isGenerating: true, generatedImage: null, batchSize: 1, model: srcNode.data.model } });
-        newEdges.push({ id: `${sourceId}-${nid}`, source: sourceId, target: nid });
-        cx += NODE_WIDTHS[srcNode.type] + 50; 
-        maxH = Math.max(maxH, (NODE_WIDTHS[srcNode.type] / targetAspectRatio) + 130);
-    }
+    // 使用优化后的createBatchNodes函数
+    const { newNodes, newEdges } = createBatchNodes(srcNode, srcNode.data.batchSize || 1, nodes, edges);
     
     handleUpdateWorkflow(ns => [...ns, ...newNodes], es => [...es, ...newEdges]);
     
     newNodes.forEach(async (n) => {
         if (n.type === 'image') {
             let url;
-            if (refImg) url = await apiFunctions.generateImageFromRef(n.data.prompt, refImg);
+            if (refImg) url = await apiFunctions.generateImageFromRef(n.data.prompt, refImg, n.data.ratio);
             else url = await apiFunctions.generateImage(n.data.prompt, n.data.ratio); 
             
             handleUpdateWorkflowFixed(ns => ns.map(curr => {
@@ -1540,10 +1532,10 @@ export default function InfiniteCanvasApp() {
                     const encodedText = encodeURIComponent(textContent + ` (ID ${n.id.toString().slice(-4)})`);
                     // Fix: Calculate dynamic mock dimensions based on aspect ratio
                     const mockW = 800;
-                    const mockH = Math.round(mockW / targetAspectRatio);
+                    const mockH = Math.round(mockW / n.data.aspectRatio);
                     const mockUrl = `https://placehold.co/${mockW}x${mockH}/1d4ed8/ffffff?text=${encodedText}`;
                     
-                    return { ...curr, data: { ...curr.data, isGenerating: false, generatedImage: url || mockUrl, aspectRatio: url ? curr.data.aspectRatio : targetAspectRatio } };
+                    return { ...curr, data: { ...curr.data, isGenerating: false, generatedImage: url || mockUrl } };
                 }
                 return curr;
             }));
@@ -1615,61 +1607,84 @@ export default function InfiniteCanvasApp() {
     
     handleUpdateWorkflowFixed(prevNodes => {
         const newNodes = [...prevNodes];
-        const GRID_W = 350, START_X = 100, START_Y = 100, MAX_PER_ROW = 4, LEVEL_MARGIN = 150, VERTICAL_SPACING = 50;
+        const GRID_W = 480, START_X = 100, START_Y = 100, MAX_PER_ROW = 4, VERTICAL_SPACING = 80, HORIZONTAL_SPACING = 30;
         
-        // 首先计算有连线的节点在Y轴上的起始位置，为单独节点留出空间
-        let connectedStartY = START_Y;
-        if (isolatedNodes.length > 0) {
-          // 计算单独节点需要占据的高度
-          const isolatedNodesMaxHeight = Math.max(...isolatedNodes.map(node => {
-            const nodeData = newNodes.find(n => n.id === node.id);
-            return nodeData ? getNodeHeight(nodeData) : 0;
-          })) + VERTICAL_SPACING * 2;
-          connectedStartY = START_Y + isolatedNodesMaxHeight;
-        }
+        // 从左到右排列，每行最多4个，添加水平间隔
+        let currentX = START_X;
+        let currentY = START_Y;
+        let currentRowCount = 0;
+        let maxRowHeight = 0;
         
-        // 先放置单独节点（无连线的节点）在顶部排成一行
-        if (isolatedNodes.length > 0) {
-          const isolatedStartX = START_X;
-          const isolatedStartY = 50; // 从更上方开始
-          const columnYPositions = {};
-          let maxCols = 0;
-          
-          isolatedNodes.forEach((node, index) => {
-            const nodeIndex = newNodes.findIndex(n => n.id === node.id);
-            if (nodeIndex === -1) return;
-            const nodeData = newNodes[nodeIndex];
-            const nodeHeight = getNodeHeight(nodeData);
-            const col = index % MAX_PER_ROW;
-            maxCols = Math.max(maxCols, col + 1);
-            const currentY = columnYPositions[col] || isolatedStartY;
-            nodeData.x = isolatedStartX + col * GRID_W;
-            nodeData.y = currentY;
-            columnYPositions[col] = currentY + nodeHeight + VERTICAL_SPACING;
-          });
-        }
-        
-        // 再放置有连线的节点，从调整后的起始Y位置开始
-        let currentLevelX = START_X;
+        // 先排列有连线的节点（按拓扑排序层级）
         if (levels.length > 0) {
-          levels.forEach((levelNodes) => {
-              if (!levelNodes || !levelNodes.length) return;
-              const columnYPositions = {}; 
-              let maxCols = 0;
-              levelNodes.forEach((nodeId, index) => {
-                  const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
-                  if (nodeIndex === -1) return;
-                  const node = newNodes[nodeIndex];
-                  const nodeHeight = getNodeHeight(node); 
-                  const col = index % MAX_PER_ROW;
-                  maxCols = Math.max(maxCols, col + 1);
-                  const currentY = columnYPositions[col] || connectedStartY;
-                  node.x = currentLevelX + col * GRID_W;
-                  node.y = currentY;
-                  columnYPositions[col] = currentY + nodeHeight + VERTICAL_SPACING;
-              });
-              currentLevelX = currentLevelX + (maxCols * GRID_W) + LEVEL_MARGIN; 
+          levels.forEach((levelNodes, levelIndex) => {
+            levelNodes.forEach((nodeId) => {
+                const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
+                if (nodeIndex === -1) return;
+                const node = newNodes[nodeIndex];
+                const nodeHeight = getNodeHeight(node);
+                const nodeWidth = getNodeWidth(node);
+                
+                // 如果当前行已满，换行
+                if (currentRowCount >= MAX_PER_ROW) {
+                    currentX = START_X;
+                    currentY += maxRowHeight + VERTICAL_SPACING;
+                    currentRowCount = 0;
+                    maxRowHeight = 0;
+                }
+                
+                node.x = currentX;
+                node.y = currentY;
+                
+                // 计算下一个节点的位置，考虑节点实际宽度和水平间距
+                currentX += nodeWidth + HORIZONTAL_SPACING;
+                currentRowCount++;
+                maxRowHeight = Math.max(maxRowHeight, nodeHeight);
+            });
+            
+            // 层级之间换行
+            if (levelIndex < levels.length - 1) {
+                currentX = START_X;
+                currentY += maxRowHeight + VERTICAL_SPACING;
+                currentRowCount = 0;
+                maxRowHeight = 0;
+            }
           });
+        }
+        
+        // 再排列无连线的节点
+        if (isolatedNodes.length > 0) {
+            // 从有连线节点下方开始
+            if (levels.length > 0) {
+                currentX = START_X;
+                currentY += maxRowHeight + VERTICAL_SPACING;
+                currentRowCount = 0;
+                maxRowHeight = 0;
+            }
+            
+            isolatedNodes.forEach((node) => {
+                const nodeIndex = newNodes.findIndex(n => n.id === node.id);
+                if (nodeIndex === -1) return;
+                const nodeData = newNodes[nodeIndex];
+                const nodeHeight = getNodeHeight(nodeData);
+                const nodeWidth = getNodeWidth(nodeData);
+                
+                // 如果当前行已满，换行
+                if (currentRowCount >= MAX_PER_ROW) {
+                    currentX = START_X;
+                    currentY += maxRowHeight + VERTICAL_SPACING;
+                    currentRowCount = 0;
+                    maxRowHeight = 0;
+                }
+                
+                nodeData.x = currentX;
+                nodeData.y = currentY;
+                
+                // 计算下一个节点的位置，考虑节点实际宽度和水平间距
+                currentX += nodeWidth + HORIZONTAL_SPACING;
+                currentRowCount++;
+                maxRowHeight = Math.max(maxRowHeight, nodeHeight);
+            });
         }
         
         return newNodes;

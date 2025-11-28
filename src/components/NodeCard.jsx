@@ -60,7 +60,7 @@ const NodeCard = React.memo(({
       if (node.type === 'image') {
         let url;
         if (referenceImage && isRefValid) {
-          url = await apiFunctions.generateImageFromRef(prompt, referenceImage);
+          url = await apiFunctions.generateImageFromRef(prompt, referenceImage, node.data.ratio);
         } else {
           url = await apiFunctions.generateImage(prompt, node.data.ratio);
         }

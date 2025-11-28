@@ -426,7 +426,7 @@ export const generateImage = async (prompt, ratio = '4:3') => {
 };
 
 // 基于参考图像的图像编辑API (兼容Google Gemini API)
-export const generateImageFromRef = async (prompt, refImage) => {
+export const generateImageFromRef = async (prompt, refImage, ratio = '4:3') => {
   if (!refImage) return null;
   
   try {
@@ -453,7 +453,7 @@ export const generateImageFromRef = async (prompt, refImage) => {
       generationConfig: {
         responseModalities: ["IMAGE"],
         imageConfig: {
-          aspectRatio: "4:3" // 默认宽高比
+          aspectRatio: ratio || "4:3" // 使用传入的比例参数
         }
       }
     });

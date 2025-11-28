@@ -94,20 +94,10 @@ export const createBatchNodes = (sourceNode, count, nodes, edges) => {
   const [w, h] = ratioStr.split(':').map(Number);
   const targetAspectRatio = w / h;
   
-  const existing = nodes.filter(n => 
-    edges.some(e => e.source === sourceNode.id && e.target === n.id)
-  );
-  
-  let lowestY = sourceNode.y;
-  if (existing.length) {
-    lowestY = existing.reduce((max, n) => 
-      Math.max(max, n.y + getNodeHeight(n)), sourceNode.y
-    );
-  }
-  
-  let cx = sourceNode.x + NODE_WIDTHS[sourceNode.type] + 150;
-  let cy = lowestY + 50;
-  let maxH = 0;
+  // 在源节点右侧紧凑排列新节点
+  const startX = sourceNode.x + NODE_WIDTHS[sourceNode.type] + 50;
+  const startY = sourceNode.y;
+  const nodeSpacing = 20; // 节点间距
   
   const newNodes = [];
   const newEdges = [];
@@ -115,17 +105,18 @@ export const createBatchNodes = (sourceNode, count, nodes, edges) => {
   for (let i = 0; i < count; i++) {
     const nid = Date.now() + i;
     
-    if (i % 4 === 0 && i !== 0) { 
-      cy += maxH + 50; 
-      cx = sourceNode.x + NODE_WIDTHS[sourceNode.type] + 150; 
-      maxH = 0; 
-    }
+    // 计算紧凑排列的位置
+    const col = i % 3; // 每行最多3个
+    const row = Math.floor(i / 3);
+    
+    const x = startX + col * (NODE_WIDTHS[sourceNode.type] + nodeSpacing);
+    const y = startY + row * (getNodeHeight(sourceNode) + nodeSpacing);
     
     newNodes.push({
       id: nid, 
       type: sourceNode.type, 
-      x: cx, 
-      y: cy, 
+      x: x, 
+      y: y, 
       data: { 
         prompt: sourceNode.data.prompt || "", 
         ratio: ratioStr, 
@@ -142,9 +133,6 @@ export const createBatchNodes = (sourceNode, count, nodes, edges) => {
       source: sourceNode.id, 
       target: nid 
     });
-    
-    cx += NODE_WIDTHS[sourceNode.type] + 50; 
-    maxH = Math.max(maxH, (NODE_WIDTHS[sourceNode.type] / targetAspectRatio) + 130);
   }
   
   return { newNodes, newEdges, targetAspectRatio };
