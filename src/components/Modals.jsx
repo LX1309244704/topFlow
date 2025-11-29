@@ -83,6 +83,12 @@ export const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onCl
     if (inputRef.current) inputRef.current.focus(); 
   }, []);
 
+  // 添加获取API Key的函数
+  const handleGetKey = () => {
+    // 打开新窗口访问API Key获取网站
+    window.open('https://ai.jmyps.com/', '_blank');
+  };
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={onClose}>
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-[400px] max-w-full border border-gray-100 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
@@ -107,11 +113,16 @@ export const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onCl
           />
         </div>
         <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-          <Button onClick={() => {onClear(); setTempKey(""); onClose();}} variant="secondary" icon={Trash2} className="text-red-500 bg-red-50 hover:bg-red-100 border-red-200">
-            清除 Key
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleGetKey} variant="secondary" className="bg-green-50 text-green-600 hover:bg-green-100 border-green-200">
+              获取 Key
+            </Button>
+            <Button onClick={() => {onClear(); setTempKey(""); onClose();}} variant="secondary" icon={Trash2} className="text-red-500 bg-red-50 hover:bg-red-100 border-red-200">
+              清除
+            </Button>
+          </div>
           <Button onClick={() => {onSave(tempKey); onClose();}} variant="primary" icon={Save} className="bg-blue-600 hover:bg-blue-700">
-            保存 Key
+            保存
           </Button>
         </div>
       </div>
