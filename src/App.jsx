@@ -133,9 +133,9 @@ const InputBadge = ({ text, type }) => {
 
 const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText }) => {
   const modelOptions = [
-    { value: "imagen-4", label: "Imagen 4.0 (AI)" },
     { value: "nano-banana", label: "Nano Banana" },
-    { value: "sdxl", label: "SDXL Lightning" },
+    { value: "nano-banana-pro", label: "Nano Banana Pro" },
+    { value: "qwen-image", label: "qwen-image" },
   ];
   const fileRef = useRef(null);
 
@@ -186,6 +186,8 @@ const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
   };
   
   const currentAspect = node.data.aspectRatio || 4/3;
+  
+
 
   return (
     <>
@@ -215,7 +217,11 @@ const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
         </div>
         <div className="flex justify-between items-center pt-2 border-t border-gray-50">
            <div className="flex gap-1.5">
-             <NodeSelect value={node.data.ratio || "4:3"} options={[{value:"1:1",label:"1:1"}, {value:"4:3",label:"4:3"}, {value:"16:9",label:"16:9"}, {value:"3:4",label:"3:4"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { const [w, h] = v.split(':').map(Number); updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: w/h} }); }} className="w-20"/>
+             <NodeSelect value={node.data.ratio || "4:3"} options={[{value:"1:1",label:"1:1"}, {value:"4:3",label:"4:3"}, {value:"16:9",label:"16:9"}, {value:"3:4",label:"3:4"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { 
+                const [w, h] = v.split(':').map(Number); 
+                const newAspectRatio = w/h;
+                updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: newAspectRatio} }); 
+              }} className="w-20"/>
              <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}, {value:4,label:"4x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
              <button onClick={() => fileRef.current?.click()} className="p-1.5 hover:bg-gray-100 rounded text-gray-400"><ImageIcon size={14}/></button>
              <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload}/>
@@ -429,7 +435,7 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
 const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
   const videoModelOptions = [
     {value:"sora2",label:"Sora 2.0"}, 
-    {value:"veo3.1",label:"veo3.1"}
+    {value:"veo_3_1-fast",label:"veo_3_1-fast"}
   ];
   
   const handleEnhance = async () => {
@@ -446,7 +452,7 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
   };
 
   const handleClearVideo = () => {
-      updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false } });
+      updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false, errorMessage: null } });
   };
 
   const imageCount = imageInputs.length;
@@ -475,6 +481,14 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
       <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 4/3 }}>
         {node.data.isGenerating ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"/><span className="text-xs text-blue-600 font-bold animate-pulse">AI Processing...</span></div>
+        ) : node.data.errorMessage ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-50/50 backdrop-blur-sm">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-2">
+              <X size={24} className="text-red-500" />
+            </div>
+            <span className="text-xs text-red-600 font-bold text-center px-2">{node.data.errorMessage}</span>
+            <button onClick={(e) => { e.stopPropagation(); handleClearVideo(); }} className="mt-2 text-xs text-red-500 hover:text-red-700 underline">清除错误</button>
+          </div>
         ) : (
           <div className="absolute inset-0 flex items-center justify-center group">
               {node.data.videoUrl ? (
@@ -508,12 +522,15 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
           <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-2 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 h-fit flex-shrink-0"><Zap size={12} className="fill-white"/>生成</button>
         </div>
         <div className="flex items-center gap-2 mt-1">
-           <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1"/>
+           <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1"/>
         </div>
         <div className="flex justify-between items-center pt-2 border-t border-gray-50">
            <div className="flex gap-1.5">
               <NodeSelect value={node.data.ratio || "16:9"} options={[{value:"16:9",label:"16:9"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { const [w, h] = v.split(':').map(Number); updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: w/h} }); }} className="w-18"/>
-              <NodeSelect value={node.data.duration || 10} options={node.data.model === 'veo3.1' ? [{value:8,label:"8秒"}] : [{value:10,label:"10秒"}, {value:15,label:"15秒"}]} icon={Clock} onChange={v => updateNode(node.id, { data: {...node.data, duration: parseInt(v)} })} className="w-18"/>
+              <NodeSelect value={node.data.duration || 10} options={node.data.model === 'veo_3_1-fast' ? [{value:8,label:"8秒"}] : [{value:10,label:"10秒"}, {value:15,label:"15秒"}]} icon={Clock} onChange={v => {
+                const newDuration = parseInt(v);
+                updateNode(node.id, { data: {...node.data, duration: newDuration} });
+              }} className="w-18"/>
                <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
            </div>
         </div>
@@ -588,21 +605,49 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
 
     try {
         if (node.type === 'image') {
-            let url;
-            if (referenceImage && isRefValid) url = await apiFunctions.generateImageFromRef(prompt, referenceImage, node.data.ratio);
-            else url = await apiFunctions.generateImage(prompt, node.data.ratio); // Pass ratio
+            // 确保比例参数正确传递
+            const selectedRatio = node.data.ratio || "4:3";
+            const selectedModel = node.data.model || "nano-banana";
             
-            if (url) {
+            let url = null;
+            
+            try {
+                if (referenceImage && isRefValid) {
+                    url = await apiFunctions.generateImageFromRef(prompt, referenceImage, selectedModel, selectedRatio);
+                } else {
+                    url = await apiFunctions.generateImage(prompt, selectedModel, selectedRatio);
+                }
+            } catch (error) {
+                console.error('❌ 图片生成API调用失败:', error);
+                url = null;
+            }
+            
+            // 如果API成功返回图片
+            if (url && url !== null && url !== undefined) {
                 setTimeout(() => {
                     updateNode(node.id, { data: { ...node.data, isGenerating: false, generatedImage: url, usingReference: false } });
                 }, 500); 
             } else {
-                const ratioStr = node.data.ratio || "4:3";
-                const [wRatio, hRatio] = ratioStr.split(':').map(Number);
-                const mockWidth = 800;
-                const mockHeight = Math.round(mockWidth * hRatio / wRatio); 
+                // 生成占位图片，确保使用正确的比例
+                const [wRatio, hRatio] = selectedRatio.split(':').map(Number);
+                const isPortrait = hRatio > wRatio;
+                
+                // 根据横竖图调整尺寸
+                let mockWidth, mockHeight;
+                if (isPortrait) {
+                    // 竖图，固定宽度为400像素
+                    mockWidth = 400;
+                    mockHeight = Math.round(mockWidth * hRatio / wRatio);
+                } else {
+                    // 横图，固定宽度为800像素
+                    mockWidth = 800;
+                    mockHeight = Math.round(mockWidth * hRatio / wRatio);
+                }
+                
                 const textContent = prompt ? prompt.split(/\s+/).slice(0, 3).join(' ') : 'Image';
                 const mockUrl = `https://placehold.co/${mockWidth}x${mockHeight}/1d4ed8/ffffff?text=${encodeURIComponent(textContent)}`;
+                
+                const calculatedAspectRatio = wRatio / hRatio;
                 
                 updateNode(node.id, { 
                     data: { 
@@ -610,7 +655,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                         isGenerating: false, 
                         generatedImage: mockUrl,
                         usingReference: false,
-                        aspectRatio: wRatio/hRatio 
+                        aspectRatio: calculatedAspectRatio 
                     } 
                 });
             }
@@ -618,7 +663,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
             try {
                 const videoUrl = await apiFunctions.generateVideo(
                     promptFromSource || node.data.prompt,
-                    node.data.model || 'sora-2',
+                    node.data.model || 'sora2',
                     referenceImages,
                     node.data.ratio || '16:9',
                     node.data.duration || 10
@@ -635,13 +680,14 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                 });
             } catch (videoError) {
                 console.error('视频生成失败:', videoError);
-                // 降级处理，使用示例视频
+                // 显示错误信息给用户
                 updateNode(node.id, { 
                     data: { 
                         ...node.data, 
                         isGenerating: false, 
-                        generatedVideo: true, 
-                        videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", 
+                        generatedVideo: false, 
+                        videoUrl: null,
+                        errorMessage: videoError.message || '视频生成失败，请检查提示词是否符合规范',
                         prompt: promptFromSource || node.data.prompt 
                     } 
                 });
@@ -1336,6 +1382,7 @@ export default function InfiniteCanvasApp() {
   const [showProjectMenu, setShowProjectMenu] = useState(false); 
   const [synopsisData, setSynopsisData] = useState(null);
   const [showTemplateList, setShowTemplateList] = useState(false);
+  const [networkError, setNetworkError] = useState(false);
   const [showApiTest, setShowApiTest] = useState(false);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
@@ -1353,39 +1400,57 @@ export default function InfiniteCanvasApp() {
       const response = await apiClient.generateText(prompt); 
       return response; 
     } catch (e) { 
+      // 如果是API Key缺失错误，显示API Key配置模态框
+      if (e.code === 'API_KEY_MISSING') {
+        setShowApiKeyModal(true);
+      }
       return "Error: " + e.message; 
     } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
   const generateStructuredSynopsis = useCallback(async (script) => { 
     try { 
       const result = await apiClient.generateStructuredSynopsis(script); 
       return result; 
     } catch (e) { 
+      // 如果是API Key缺失错误，显示API Key配置模态框
+      if (e.code === 'API_KEY_MISSING') {
+        setShowApiKeyModal(true);
+      }
       return { synopsis: `Error: ${e.message}`, characters: [], key_scenes: [] }; 
     } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
-  const generateImage = useCallback(async (prompt, ratio) => { 
+  const generateImage = useCallback(async (prompt, model = 'nano-banana', ratio = '4:3') => { 
+      console.log('🎨 App.jsx generateImage调用:', { prompt, model, ratio });
       try { 
-          const imageData = await apiClient.generateImage(prompt, ratio); 
+          const imageData = await apiClient.generateImage(prompt, model, ratio); 
           return imageData; 
       } catch (error) { 
           console.error("Image generation error:", error); 
+          // 如果是API Key缺失错误，显示API Key配置模态框
+          if (error.code === 'API_KEY_MISSING') {
+            setShowApiKeyModal(true);
+          }
           return null; 
       } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
-  const generateImageFromRef = useCallback(async (prompt, refImg, ratio) => { 
+  const generateImageFromRef = useCallback(async (prompt, refImg, model = 'nano-banana', ratio = '4:3') => { 
+      console.log('🎨 App.jsx generateImageFromRef调用:', { prompt, model, ratio, hasRefImage: !!refImg });
       if (!refImg) return null; 
       try { 
-          const imageData = await apiClient.generateImageFromRef(prompt, refImg, ratio); 
+          const imageData = await apiClient.generateImageFromRef(prompt, refImg, model, ratio); 
           return imageData; 
       } catch (error) { 
           console.error("Image editing error:", error); 
+          // 如果是API Key缺失错误，显示API Key配置模态框
+          if (error.code === 'API_KEY_MISSING') {
+            setShowApiKeyModal(true);
+          }
           return null; 
       } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
   const generateSpeech = useCallback(async (text) => { 
       try { 
@@ -1393,19 +1458,38 @@ export default function InfiniteCanvasApp() {
           return audioData; 
       } catch (error) { 
           console.error("Speech generation error:", error); 
+          // 如果是API Key缺失错误，显示API Key配置模态框
+          if (error.code === 'API_KEY_MISSING') {
+            setShowApiKeyModal(true);
+          }
           return null; 
       } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
-  const generateVideo = useCallback(async (prompt, model, images, aspectRatio) => { 
+  const generateVideo = useCallback(async (prompt, model, images, aspectRatio, duration) => { 
       try { 
-          const videoData = await apiClient.generateVideo(prompt, model, images, aspectRatio); 
+          const videoData = await apiClient.generateVideo(prompt, model, images, aspectRatio, duration); 
           return videoData; 
       } catch (error) { 
           console.error("Video generation error:", error); 
+          
+          // 如果是API Key缺失错误，显示API Key配置模态框
+          if (error.code === 'API_KEY_MISSING') {
+            setShowApiKeyModal(true);
+          }
+          
+          // 如果是网络错误，显示友好的错误消息
+          if (error.isNetworkError || error.message.includes('网络连接失败') || error.message.includes('Failed to fetch')) {
+            console.warn('🌐 检测到网络连接问题，将使用备用视频');
+            // 设置网络错误状态，可以用于显示通知
+            setNetworkError(true);
+            // 3秒后清除错误状态
+            setTimeout(() => setNetworkError(false), 3000);
+          }
+          
           return null; 
       } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
   // Workflow Helpers
   const currentEpisodeId = project.currentEpisodeId;
@@ -1436,9 +1520,13 @@ export default function InfiniteCanvasApp() {
       return response; 
     } catch (e) { 
       console.error('流式文本生成错误:', e);
+      // 如果是API Key缺失错误，显示API Key配置模态框
+      if (e.code === 'API_KEY_MISSING') {
+        setShowApiKeyModal(true);
+      }
       return '生成失败'; 
     } 
-  }, []);
+  }, [setShowApiKeyModal, setNetworkError]);
 
   const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, handleTextNodeAnalysis]);
   
@@ -1456,7 +1544,7 @@ export default function InfiniteCanvasApp() {
     const pos = x && y ? { x, y } : { x: (window.innerWidth/2 - offset.x)/scale - 160, y: (window.innerHeight/2 - offset.y)/scale - 100 };
     let initialData = { prompt: "", isGenerating: false };
     if (type === 'image') initialData = { ...initialData, model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 };
-    else if (type === 'video') initialData = { ...initialData, model: "svd-xt", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
+    else if (type === 'video') initialData = { ...initialData, model: "sora2", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
     else if (type === 'text') initialData = { text: "", isAnalyzing: false, isWriting: false, height: 200 }; 
     
     const newNode = { id: Date.now(), type, x: pos.x, y: pos.y, data: initialData };
@@ -1519,11 +1607,15 @@ export default function InfiniteCanvasApp() {
     
     handleUpdateWorkflow(ns => [...ns, ...newNodes], es => [...es, ...newEdges]);
     
-    newNodes.forEach(async (n) => {
+        newNodes.forEach(async (n) => {
         if (n.type === 'image') {
             let url;
-            if (refImg) url = await apiFunctions.generateImageFromRef(n.data.prompt, refImg, n.data.ratio);
-            else url = await apiFunctions.generateImage(n.data.prompt, n.data.ratio); 
+            
+            if (refImg) {
+                url = await apiFunctions.generateImageFromRef(n.data.prompt, refImg, n.data.model || 'nano-banana', n.data.ratio);
+            } else {
+                url = await apiFunctions.generateImage(n.data.prompt, n.data.model || 'nano-banana', n.data.ratio);
+            } 
             
             handleUpdateWorkflowFixed(ns => ns.map(curr => {
                 if (curr.id === n.id) {
@@ -1804,6 +1896,23 @@ export default function InfiniteCanvasApp() {
       {showTemplateList && <TemplateListModal onClose={() => setShowTemplateList(false)} onSelectTemplate={handleSelectTemplate} />}
       {showSaveTemplateModal && <SaveTemplateModal onClose={() => setShowSaveTemplateModal(false)} onSave={handleSaveTemplate} projectData={{ nodes, edges }} />}
       {showAssetModal && <AssetModal onClose={() => setShowAssetModal(false)} />}
+      
+      {/* 网络错误通知 */}
+      {networkError && (
+        <div className="fixed top-4 right-4 z-[150] bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 rounded shadow-lg max-w-md animate-in fade-in slide-in-from-right-2 duration-300">
+          <div className="flex">
+            <div className="py-1">
+              <svg className="fill-current h-6 w-6 text-orange-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                <path d="M2.93 17.07A10 10 0 1 1 17.07 2.93 10 10 0 0 1 2.93 17.07zm12.73-1.41A8 8 0 1 0 4.34 4.34a8 8 0 0 0 11.32 11.32zM9 11V9h2v6H9v-4zm0-6h2v2H9V5z"/>
+              </svg>
+            </div>
+            <div>
+              <p className="font-bold">网络连接问题</p>
+              <p className="text-sm">检测到网络连接问题，正在使用备用内容。请检查您的网络连接。</p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {showApiTest && (
         <div className="absolute inset-0 z-[180] bg-black/30 flex items-center justify-center animate-in fade-in duration-200">

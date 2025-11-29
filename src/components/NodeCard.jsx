@@ -58,34 +58,59 @@ const NodeCard = React.memo(({
 
     try {
       if (node.type === 'image') {
-        let url;
-        if (referenceImage && isRefValid) {
-          url = await apiFunctions.generateImageFromRef(prompt, referenceImage, node.data.ratio);
-        } else {
-          url = await apiFunctions.generateImage(prompt, node.data.ratio);
+        // 确保比例参数正确传递
+        const selectedRatio = node.data.ratio || "4:3";
+        const selectedModel = node.data.model || "nano-banana";
+        
+        let url = null;
+        
+        try {
+            if (referenceImage && isRefValid) {
+                url = await apiFunctions.generateImageFromRef(prompt, referenceImage, selectedModel, selectedRatio);
+            } else {
+                url = await apiFunctions.generateImage(prompt, selectedModel, selectedRatio);
+            }
+        } catch (error) {
+            console.error('❌ NodeCard图片生成API调用失败:', error);
+            url = null;
         }
         
-        if (url) {
-          setTimeout(() => {
-            updateNode(node.id, { data: { ...node.data, isGenerating: false, generatedImage: url, usingReference: false } });
-          }, 500); 
+        // 如果API成功返回图片
+        if (url && url !== null && url !== undefined) {
+            setTimeout(() => {
+                updateNode(node.id, { data: { ...node.data, isGenerating: false, generatedImage: url, usingReference: false } });
+            }, 500); 
         } else {
-          const ratioStr = node.data.ratio || "4:3";
-          const [wRatio, hRatio] = ratioStr.split(':').map(Number);
-          const mockWidth = 800;
-          const mockHeight = Math.round(mockWidth * hRatio / wRatio); 
-          const textContent = prompt ? prompt.split(/\s+/).slice(0, 3).join(' ') : 'Image';
-          const mockUrl = `https://placehold.co/${mockWidth}x${mockHeight}/1d4ed8/ffffff?text=${encodeURIComponent(textContent)}`;
-          
-          updateNode(node.id, { 
-            data: { 
-              ...node.data, 
-              isGenerating: false, 
-              generatedImage: mockUrl,
-              usingReference: false,
-              aspectRatio: wRatio/hRatio 
-            } 
-          });
+            // 生成占位图片，确保使用正确的比例
+            const [wRatio, hRatio] = selectedRatio.split(':').map(Number);
+            const isPortrait = hRatio > wRatio;
+            
+            // 根据横竖图调整尺寸
+            let mockWidth, mockHeight;
+            if (isPortrait) {
+                // 竖图，固定宽度为400像素
+                mockWidth = 400;
+                mockHeight = Math.round(mockWidth * hRatio / wRatio);
+            } else {
+                // 横图，固定宽度为800像素
+                mockWidth = 800;
+                mockHeight = Math.round(mockWidth * hRatio / wRatio);
+            }
+            
+            const textContent = prompt ? prompt.split(/\s+/).slice(0, 3).join(' ') : 'Image';
+            const mockUrl = `https://placehold.co/${mockWidth}x${mockHeight}/1d4ed8/ffffff?text=${encodeURIComponent(textContent)}`;
+            
+            const calculatedAspectRatio = wRatio / hRatio;
+            
+            updateNode(node.id, { 
+                data: { 
+                    ...node.data, 
+                    isGenerating: false, 
+                    generatedImage: mockUrl,
+                    usingReference: false,
+                    aspectRatio: calculatedAspectRatio 
+                } 
+            });
         }
       } else if (node.type === 'video') {
         setTimeout(() => {

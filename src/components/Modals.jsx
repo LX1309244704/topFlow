@@ -77,25 +77,11 @@ export const ProjectMenu = React.memo(({
 // API Key配置模态框
 export const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onClear }) => {
   const [tempKey, setTempKey] = useState(currentKey);
-  const [isLoadingKey, setIsLoadingKey] = useState(false);
   const inputRef = useRef(null);
   
   useEffect(() => { 
     if (inputRef.current) inputRef.current.focus(); 
   }, []);
-
-  const handleFetchKey = async () => {
-    setIsLoadingKey(true);
-    try {
-      const apiKey = await apiClient.getApiKey();
-      setTempKey(apiKey);
-    } catch (error) {
-      console.error('获取API Key失败:', error);
-      alert('获取API Key失败，请稍后重试');
-    } finally {
-      setIsLoadingKey(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={onClose}>
@@ -108,22 +94,17 @@ export const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onCl
             <X size={20} />
           </button>
         </div>
-        <p className="text-sm text-gray-500 mb-4">配置AI服务的API Key。您可以直接输入，或点击下方按钮从服务器获取。</p>
+        <p className="text-sm text-gray-500 mb-4">请配置您的AI服务API Key。该Key将用于所有AI服务调用。</p>
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
-          <div className="flex gap-2">
-            <input 
-              ref={inputRef} 
-              type="password" 
-              value={tempKey} 
-              onChange={(e) => setTempKey(e.target.value)} 
-              placeholder="AIzaSy..." 
-              className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm" 
-            />
-            <Button onClick={handleFetchKey} disabled={isLoadingKey} variant="secondary" className="whitespace-nowrap">
-              {isLoadingKey ? '获取中...' : '获取Key'}
-            </Button>
-          </div>
+          <input 
+            ref={inputRef} 
+            type="password" 
+            value={tempKey} 
+            onChange={(e) => setTempKey(e.target.value)} 
+            placeholder="AIzaSy..." 
+            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm" 
+          />
         </div>
         <div className="flex justify-between items-center pt-3 border-t border-gray-100">
           <Button onClick={() => {onClear(); setTempKey(""); onClose();}} variant="secondary" icon={Trash2} className="text-red-500 bg-red-50 hover:bg-red-100 border-red-200">
