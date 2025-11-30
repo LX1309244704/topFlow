@@ -9,6 +9,7 @@ import {
   generateGeminiStructuredSynopsis 
 } from './geminiService.js';
 import { generateSpeech } from './ttsService.js';
+import { generateSong } from './sunoService.js';
 
 /**
  * 统一视频生成接口，根据模型选择对应的服务
@@ -95,6 +96,18 @@ export const generateStructuredSynopsis = async (script) => {
   return await generateGeminiStructuredSynopsis(script);
 };
 
+/**
+ * 统一歌曲生成接口
+ * @param {string} lyrics - 歌词内容
+ * @param {string} style - 歌曲风格
+ * @param {string} model - 模型名称，默认为suno-v3
+ * @returns {Promise<string>} Base64编码的音频数据
+ */
+export const generateTtsSong = async (lyrics, style = 'pop', model = 'suno-v3') => {
+  console.log('统一歌曲生成接口调用:', { lyrics, style, model });
+  return await generateSong(lyrics, style, model);
+};
+
 // 导出所有服务接口，方便直接使用
 export {
   // 视频生成服务
@@ -109,7 +122,10 @@ export {
   generateGeminiStructuredSynopsis,
   
   // 语音合成服务
-  generateSpeech
+  generateSpeech,
+  
+  // 歌曲生成服务
+  generateSong
 };
 
 export default {
@@ -121,6 +137,7 @@ export default {
   generateImageFromRef,
   generateTts,
   generateStructuredSynopsis,
+  generateTtsSong,
   
   // 直接接口
   generateSora2Video,
@@ -130,5 +147,6 @@ export default {
   generateGeminiImage,
   generateGeminiImageFromRef,
   generateGeminiStructuredSynopsis,
-  generateSpeech
+  generateSpeech,
+  generateSong
 };

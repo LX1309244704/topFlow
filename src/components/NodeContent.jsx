@@ -409,16 +409,20 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           </div>
           {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
         </div>
+        
         <div className="relative">
-          <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} />
+          <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-md p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} />
           <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors">
             <Wand2 size={14} />
           </button>
         </div>
+        
         <div className="flex items-center gap-2 mt-1">
           <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+        
+        {/* 底部操作栏 - 确保生成按钮在右下角 */}
+        <div className="flex justify-between items-center pt-2 border-t border-gray-50 w-full">
           <div className="flex gap-1.5">
             <NodeSelect 
               value={node.data.ratio || "16:9"} 
@@ -442,7 +446,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               className="w-16" 
             />
           </div>
-          <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95">
+          <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 ml-auto">
             <Wand2 size={10} className="fill-white" />生成
           </button>
         </div>
@@ -452,38 +456,228 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 };
 
 // 音频节点内容组件
-export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel }) => (
-  <>
-    <div className={`relative w-full h-24 bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`}>
-      {node.data.isGenerating ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
-          <span className="text-[10px] text-blue-600 font-mono animate-pulse">Synthesizing...</span>
-        </div>
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-between px-6 group">
-          {node.data.audioUrl ? (
-            <audio controls src={node.data.audioUrl} className="w-full h-8" />
-          ) : (
-            <>
-              <div className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center text-blue-600 shadow-sm">
-                <Play size={16} fill="currentColor" className="ml-0.5" />
-              </div>
-              <div className="flex items-center gap-1 h-8 opacity-60">
-                {[...Array(15)].map((_,i) => <div key={i} className="w-1 bg-blue-500 rounded-full" style={{ height: `${Math.random() * 100}%` }}></div>)}
-              </div>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-    <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[200px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
-      {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
-      <textarea className="w-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0" placeholder="输入要朗读的文本..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, text: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} />
-      <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-        <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95">
-          <Wand2 size={10} className="fill-white" />生成音频
-        </button>
+export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel }) => {
+  const audioMode = node.data.audioMode || 'speech'; // 默认为语音合成模式
+  const minTextHeight = 80; // 最小文本输入框高度
+  const currentTextHeight = node.data.textHeight || minTextHeight; // 当前文本输入框高度
+  const [localResizing, setLocalResizing] = useState(false);
+  const textAreaRef = useRef(null);
+  
+  // 音色选项
+  const voiceOptions = [
+    { value: "alloy", label: "Alloy (中性)" },
+    { value: "echo", label: "Echo (男声)" },
+    { value: "fable", label: "Fable (英式)" },
+    { value: "onyx", label: "Onyx (深沉男声)" },
+    { value: "nova", label: "Nova (女声)" },
+    { value: "shimmer", label: "Shimmer (柔和女声)" }
+  ];
+  
+  // 歌曲风格选项
+  const styleOptions = [
+    { value: "pop", label: "流行音乐" },
+    { value: "rock", label: "摇滚" },
+    { value: "jazz", label: "爵士" },
+    { value: "classical", label: "古典" },
+    { value: "electronic", label: "电子" },
+    { value: "folk", label: "民谣" },
+    { value: "country", label: "乡村" },
+    { value: "hip-hop", label: "嘻哈" }
+  ];
+  
+  // 拖拽调整文本输入框高度的逻辑
+  const handleLocalResize = useCallback((e) => {
+    if (!localResizing || !textAreaRef.current) return;
+    const dy = e.clientY - textAreaRef.current.initialY;
+    let newHeight = textAreaRef.current.initialHeight + dy;
+    newHeight = Math.max(minTextHeight, newHeight);
+    updateNode(node.id, { data: { ...node.data, textHeight: newHeight } });
+  }, [localResizing, updateNode, node.id, node.data]);
+
+  const handleLocalResizeEnd = useCallback(() => {
+    setLocalResizing(false);
+    document.body.style.cursor = 'default';
+  }, []);
+
+  useEffect(() => {
+    if (localResizing) {
+      window.addEventListener('mousemove', handleLocalResize);
+      window.addEventListener('mouseup', handleLocalResizeEnd);
+      document.body.style.cursor = 'ns-resize';
+    } else {
+      window.removeEventListener('mousemove', handleLocalResize);
+      window.removeEventListener('mouseup', handleLocalResizeEnd);
+      document.body.style.cursor = 'default';
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleLocalResize);
+      window.removeEventListener('mouseup', handleLocalResizeEnd);
+    };
+  }, [localResizing, handleLocalResize, handleLocalResizeEnd]);
+
+  // 切换音频模式
+  const toggleAudioMode = (mode) => {
+    updateNode(node.id, { data: { ...node.data, audioMode: mode } });
+  };
+  
+  // 获取当前模式的状态文本
+  const getModeStatus = () => {
+    if (audioMode === 'speech') {
+      const voice = node.data.voice || 'alloy';
+      const voiceOption = voiceOptions.find(v => v.value === voice);
+      return { text: `语音合成 (${voiceOption?.label || voice})`, color: 'text-blue-500' };
+    } else {
+      const style = node.data.style || 'pop';
+      const styleOption = styleOptions.find(s => s.value === style);
+      return { text: `歌曲生成 (${styleOption?.label || style})`, color: 'text-purple-500' };
+    }
+  };
+  
+  const modeStatus = getModeStatus();
+  
+  return (
+    <>
+      <div className={`relative w-full h-24 bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`}>
+        {node.data.isGenerating ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
+            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-1" />
+            <span className="text-[10px] text-blue-600 font-mono animate-pulse">
+              {audioMode === 'song' ? '生成歌曲中...' : '合成语音中...'}
+            </span>
+          </div>
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-between px-6 group">
+            {node.data.audioUrl ? (
+              <audio controls src={node.data.audioUrl} className="w-full h-8" />
+            ) : (
+              <>
+                <div className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center text-blue-600 shadow-sm">
+                  {audioMode === 'song' ? (
+                    <Music size={16} />
+                  ) : (
+                    <Play size={16} fill="currentColor" className="ml-0.5" />
+                  )}
+                </div>
+                <div className="flex items-center gap-1 h-8 opacity-60">
+                  {[...Array(15)].map((_,i) => <div key={i} className="w-1 bg-blue-500 rounded-full" style={{ height: `${Math.random() * 100}%` }}></div>)}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
-    </div>
-  </>
-);
+      
+      <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[400px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
+        <div className="flex justify-between items-center">
+          <div className="flex items-center gap-2 text-xs">
+            {audioMode === 'song' ? (
+              <Music size={12} className={modeStatus.color} />
+            ) : (
+              <Play size={12} className={modeStatus.color} />
+            )}
+            <span className={`font-semibold ${modeStatus.color}`}>{modeStatus.text}</span>
+          </div>
+          {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
+        </div>
+        
+        {/* 模式切换按钮 */}
+        <div className="flex gap-2 p-1 bg-gray-50 rounded-lg">
+          <button
+            onClick={() => toggleAudioMode('speech')}
+            className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${
+              audioMode === 'speech' 
+                ? 'bg-white text-blue-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            语音生成
+          </button>
+          <button
+            onClick={() => toggleAudioMode('song')}
+            className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${
+              audioMode === 'song' 
+                ? 'bg-white text-purple-600 shadow-sm' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            歌曲生成
+          </button>
+        </div>
+        
+        {/* 文本/歌词输入区域 - 可调整高度 */}
+        <div ref={textAreaRef} className="relative border border-gray-100 rounded-lg overflow-hidden" style={{ height: `${currentTextHeight}px` }}>
+          <textarea 
+            className="w-full h-full text-sm bg-transparent p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none border-none" 
+            placeholder={audioMode === 'song' ? '输入歌词...' : '输入要朗读的文本...'} 
+            value={audioMode === 'song' ? (node.data.lyrics || '') : (node.data.prompt || '')} 
+            onChange={e => updateNode(node.id, { 
+              data: { 
+                ...node.data, 
+                [audioMode === 'song' ? 'lyrics' : 'text']: e.target.value 
+              } 
+            })} 
+            onMouseDown={e => e.stopPropagation()} 
+            onWheel={e => e.stopPropagation()} 
+          />
+          {/* 拖拽调整高度的手柄 */}
+          <div 
+            className="absolute right-0 bottom-0 w-4 h-4 cursor-ns-resize z-10 text-gray-400 hover:text-blue-500 flex items-center justify-center transition-colors"
+            onMouseDown={(e) => { 
+              e.stopPropagation(); 
+              textAreaRef.current.initialY = e.clientY; 
+              textAreaRef.current.initialHeight = currentTextHeight; 
+              setLocalResizing(true); 
+            }}
+          >
+            <span className="w-1.5 h-1.5 bg-current rounded-full absolute -bottom-0.5 -right-0.5" />
+          </div>
+        </div>
+        
+        {/* 模式特定选项 */}
+        {audioMode === 'speech' ? (
+          <div className="flex items-center gap-2 mt-1">
+            <NodeSelect 
+              value={node.data.voice || "alloy"} 
+              options={voiceOptions} 
+              onChange={v => updateNode(node.id, { data: { ...node.data, voice: v } })} 
+              className="flex-1" 
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 mt-1">
+            <NodeSelect 
+              value={node.data.style || "pop"} 
+              options={styleOptions} 
+              onChange={v => updateNode(node.id, { data: { ...node.data, style: v } })} 
+              className="flex-1" 
+            />
+          </div>
+        )}
+        
+        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+          <div className="flex gap-1.5">
+            <NodeSelect 
+              value={node.data.batchSize || 1} 
+              options={[
+                {value:1,label:"1x"}, 
+                {value:2,label:"2x"}
+              ]} 
+              icon={Layers} 
+              onChange={v => updateNode(node.id, { 
+                data: {...node.data, batchSize: parseInt(v)} 
+              })} 
+              className="w-16" 
+            />
+          </div>
+          <button 
+            onClick={handleGenerate} 
+            className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95"
+          >
+            <Wand2 size={10} className="fill-white" />
+            {audioMode === 'song' ? '生成歌曲' : '生成音频'}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+};

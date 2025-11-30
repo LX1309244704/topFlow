@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
+import { AudioContent } from './components/NodeContent.jsx';
 
 // --- Global API Key ---
 const apiKey = ""; 
@@ -512,19 +513,14 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
             <div className="flex items-center gap-2 text-xs"><LinkIcon size={12} className={inputStatusColor} /><span className={`font-semibold ${inputStatusColor}`}>{inputStatusText}</span></div>
             {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
         </div>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex-1">
-            <div className="relative">
-                <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
-                <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors"><Wand2 size={14} /></button>
-            </div>
-          </div>
-          <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-2 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 h-fit flex-shrink-0"><Zap size={12} className="fill-white"/>生成</button>
+        <div className="relative">
+            <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
+            <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors"><Wand2 size={14} /></button>
         </div>
         <div className="flex items-center gap-2 mt-1">
            <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1"/>
         </div>
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+        <div className="flex justify-between items-center pt-2 border-t border-gray-50 w-full">
            <div className="flex gap-1.5">
               <NodeSelect value={node.data.ratio || "16:9"} options={[{value:"16:9",label:"16:9"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { const [w, h] = v.split(':').map(Number); updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: w/h} }); }} className="w-18"/>
               <NodeSelect value={node.data.duration || 10} options={node.data.model === 'veo_3_1-fast' ? [{value:8,label:"8秒"}] : [{value:10,label:"10秒"}, {value:15,label:"15秒"}]} icon={Clock} onChange={v => {
@@ -533,41 +529,14 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
               }} className="w-18"/>
                <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
            </div>
+           <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 ml-auto"><Zap size={12} className="fill-white"/>生成</button>
         </div>
       </div>
     </>
   );
 };
 
-const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel }) => (
-  <>
-    <div className={`relative w-full h-24 bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`}>
-      {node.data.isGenerating ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm"><span className="text-[10px] text-blue-600 font-mono animate-pulse">Synthesizing...</span></div>
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-between px-6 group">
-            {node.data.audioUrl ? (
-                <audio controls src={node.data.audioUrl} className="w-full h-8" />
-            ) : (
-                <>
-                    <div className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center text-blue-600 shadow-sm"><Play size={16} fill="currentColor" className="ml-0.5"/></div>
-                    <div className="flex items-center gap-1 h-8 opacity-60">{[...Array(15)].map((_,i) => <div key={i} className="w-1 bg-blue-500 rounded-full" style={{ height: `${Math.random() * 100}%` }}></div>)}</div>
-                </>
-            )}
-        </div>
-      )}
-    </div>
-    <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[200px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
-      {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex-1">
-          <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none" placeholder="输入要朗读的文本..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, text: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
-        </div>
-        <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-2 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 h-fit flex-shrink-0"><Zap size={12} className="fill-white"/>生成音频</button>
-      </div>
-    </div>
-  </>
-);
+
 
 const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnectStart, onConnectEnd, linkedSources, onSpawnNodes, onDelete, apiFunctions, onShowAssetModal }) => {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -702,7 +671,19 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                 });
             }
         } else if (node.type === 'audio') {
-            const audioUrl = await apiFunctions.generateSpeech(promptFromSource);
+            let audioUrl = null;
+            // 根据音频节点模式选择不同的生成方法
+            if (node.data.audioMode === 'song') {
+              // 歌曲生成模式
+              const lyrics = promptFromSource || node.data.lyrics || '';
+              const style = node.data.style || 'pop';
+              audioUrl = await apiFunctions.generateSong(lyrics, style);
+            } else {
+              // 默认语音合成模式
+              const voice = node.data.voice || 'alloy';
+              audioUrl = await apiFunctions.generateSpeech(promptFromSource, 'tts-1', voice);
+            }
+            
              setTimeout(() => {
                 updateNode(node.id, { data: { ...node.data, isGenerating: false, audioUrl: audioUrl } });
              }, 500);

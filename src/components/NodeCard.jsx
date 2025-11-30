@@ -134,7 +134,19 @@ const NodeCard = React.memo(({
           });
         }, 2000);
       } else if (node.type === 'audio') {
-        const audioUrl = await apiFunctions.generateSpeech(promptFromSource);
+        let audioUrl = null;
+        // 根据音频节点模式选择不同的生成方法
+        if (node.data.audioMode === 'song') {
+          // 歌曲生成模式
+          const lyrics = promptFromSource || node.data.lyrics || '';
+          const style = node.data.style || 'pop';
+          audioUrl = await apiFunctions.generateSong(lyrics, style);
+        } else {
+          // 默认语音合成模式
+          const voice = node.data.voice || 'alloy';
+          audioUrl = await apiFunctions.generateSpeech(promptFromSource, 'tts-1', voice);
+        }
+        
         setTimeout(() => {
           updateNode(node.id, { data: { ...node.data, isGenerating: false, audioUrl: audioUrl } });
         }, 500);
