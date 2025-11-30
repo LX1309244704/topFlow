@@ -759,6 +759,8 @@ const ProjectMenu = React.memo(({ onClose, episodes, currentEpisodeId, onUpdateN
 // 导航图组件
 const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visible = true }) => {
     const mapRef = useRef(null);
+    const [clickedNodeId, setClickedNodeId] = useState(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState(null);
     
     // 计算画布边界和缩放比例
     const getMapTransformations = useCallback(() => {
@@ -827,46 +829,124 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
         return { scaleFactor, viewportRect, nodePositions, offsetX, offsetY, contentWidth, contentHeight };
     }, [nodes, offset, scale, canvasSize]);
     
-    const handleMapClick = useCallback((e) => {
-        if (!mapRef.current) return;
+    // 检测点击或悬停的节点
+    const detectNodeAtPosition = useCallback((clientX, clientY) => {
+        if (!mapRef.current) return null;
         
         const rect = mapRef.current.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const clickY = e.clientY - rect.top;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
         
         const transformations = getMapTransformations();
-        if (!transformations.viewportRect) return;
+        if (!transformations.viewportRect) return null;
         
-        // 检查是否点击了某个节点
-        let clickedNode = null;
+        // 改进节点检测：增加容错范围，提高准确性
+        let detectedNode = null;
+        let closestDistance = Infinity;
+        const TOLERANCE = 3; // 像素容错范围
+        
         for (const nodePos of transformations.nodePositions) {
-            if (clickX >= nodePos.x && clickX <= nodePos.x + nodePos.width &&
-                clickY >= nodePos.y && clickY <= nodePos.y + nodePos.height) {
-                clickedNode = nodePos;
-                break;
+            // 检查是否在节点边界内（包含容错范围）
+            const isInNode = x >= nodePos.x - TOLERANCE && 
+                           x <= nodePos.x + nodePos.width + TOLERANCE &&
+                           y >= nodePos.y - TOLERANCE && 
+                           y <= nodePos.y + nodePos.height + TOLERANCE;
+            
+            if (isInNode) {
+                // 计算到节点中心的距离，选择最近的节点
+                const nodeCenterX = nodePos.x + nodePos.width / 2;
+                const nodeCenterY = nodePos.y + nodePos.height / 2;
+                const distance = Math.sqrt(Math.pow(x - nodeCenterX, 2) + Math.pow(y - nodeCenterY, 2));
+                
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    detectedNode = nodePos;
+                }
             }
         }
+        
+        return detectedNode;
+    }, [getMapTransformations]);
+    
+    const handleMapMouseMove = useCallback((e) => {
+        const detectedNode = detectNodeAtPosition(e.clientX, e.clientY);
+        setHoveredNodeId(detectedNode ? detectedNode.id : null);
+    }, [detectNodeAtPosition]);
+    
+    const handleMapMouseLeave = useCallback(() => {
+        setHoveredNodeId(null);
+    }, []);
+    
+    const handleMapClick = useCallback((e) => {
+        const clickedNode = detectNodeAtPosition(e.clientX, e.clientY);
+        const currentTransformations = getMapTransformations();
+        
+        if (!currentTransformations.viewportRect) return;
         
         let targetX, targetY;
         
         if (clickedNode) {
-            // 点击了节点，将节点中心居中显示
-            const nodeCenterX = (clickedNode.x + clickedNode.width / 2 - transformations.offsetX) / transformations.scaleFactor;
-            const nodeCenterY = (clickedNode.y + clickedNode.height / 2 - transformations.offsetY) / transformations.scaleFactor;
+            // 简化坐标转换：直接从导航图节点位置反算到画布位置
+            const minX = Math.min(...nodes.map(n => n.x));
+            const minY = Math.min(...nodes.map(n => n.y));
             
+            // 找到对应的原始节点
+            const originalNode = nodes.find(n => n.id === clickedNode.id);
+            if (!originalNode) return;
+            
+            // 直接使用原始节点的中心位置
+            const nodeCenterX = originalNode.x + getNodeWidth(originalNode) / 2;
+            const nodeCenterY = originalNode.y + getNodeHeight(originalNode) / 2;
+            
+            // 计算目标偏移量，使节点中心位于画布中心
             targetX = -nodeCenterX * scale + canvasSize.width / 2;
             targetY = -nodeCenterY * scale + canvasSize.height / 2;
+            
+            // 确保节点不会超出屏幕边界
+            const nodeWidth = getNodeWidth(originalNode);
+            const nodeHeight = getNodeHeight(originalNode);
+            
+            // 正确的边界检查：计算节点在画布上的显示边界
+            const nodeLeftBoundary = -nodeCenterX * scale; // 节点左侧边界
+            const nodeRightBoundary = -nodeCenterX * scale + canvasSize.width - nodeWidth * scale; // 节点右侧边界
+            const nodeTopBoundary = -nodeCenterY * scale; // 节点顶部边界
+            const nodeBottomBoundary = -nodeCenterY * scale + canvasSize.height - nodeHeight * scale; // 节点底部边界
+            
+            // 确保目标位置在有效范围内
+            targetX = Math.max(nodeLeftBoundary, Math.min(nodeRightBoundary, targetX));
+            targetY = Math.max(nodeTopBoundary, Math.min(nodeBottomBoundary, targetY));
+            
+            // 调试信息
+            console.log('导航图点击调试:', {
+                clickedNodeId: clickedNode.id,
+                originalNodePos: {x: originalNode.x, y: originalNode.y},
+                nodeCenter: {x: nodeCenterX, y: nodeCenterY},
+                targetOffset: {x: targetX, y: targetY},
+                canvasSize: canvasSize,
+                scale: scale
+            });
         } else {
             // 点击空白区域，将点击位置居中
-            const canvasX = (clickX - transformations.offsetX) / transformations.scaleFactor;
-            const canvasY = (clickY - transformations.offsetY) / transformations.scaleFactor;
+            const rect = mapRef.current.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+            
+            const canvasX = (clickX - currentTransformations.offsetX) / currentTransformations.scaleFactor;
+            const canvasY = (clickY - currentTransformations.offsetY) / currentTransformations.scaleFactor;
             
             targetX = -canvasX * scale + canvasSize.width / 2;
             targetY = -canvasY * scale + canvasSize.height / 2;
         }
         
-        onNavigate({ x: targetX, y: targetY });
-    }, [getMapTransformations, scale, canvasSize, onNavigate]);
+        // 设置点击的节点ID（如果有）
+        setClickedNodeId(clickedNode ? clickedNode.id : null);
+        
+        // 使用平滑动画导航到目标位置
+        onNavigate({ x: targetX, y: targetY }, 500);
+        
+        // 清除点击状态
+        setTimeout(() => setClickedNodeId(null), 300);
+    }, [getMapTransformations, scale, canvasSize, onNavigate, nodes]);
     
     const transformations = getMapTransformations();
     
@@ -878,6 +958,8 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
             className="absolute bottom-24 right-4 z-[100] bg-white/90 backdrop-blur-sm rounded-lg shadow-lg cursor-pointer hover:bg-white/95 transition-all duration-200"
             style={{ width: '200px', height: '140px' }}
             onClick={handleMapClick}
+            onMouseMove={handleMapMouseMove}
+            onMouseLeave={handleMapMouseLeave}
             title="点击节点导航到画布位置"
         >
             <svg width="100%" height="100%" className="rounded-md">
@@ -892,23 +974,36 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
                 />
                 
                 {/* 节点 */}
-                {transformations.nodePositions.map(node => (
-                    <rect
-                        key={node.id}
-                        x={node.x}
-                        y={node.y}
-                        width={Math.max(node.width, 2)}
-                        height={Math.max(node.height, 2)}
-                        fill={{
-                            text: '#9ca3af',
-                            image: '#3b82f6',
-                            video: '#8b5cf6',
-                            audio: '#10b981'
-                        }[node.type] || '#6b7280'}
-                        rx={2}
-                        className="transition-all duration-150 hover:opacity-80"
-                    />
-                ))}
+                {transformations.nodePositions.map(node => {
+                    const isHovered = hoveredNodeId === node.id;
+                    const isClicked = clickedNodeId === node.id;
+                    
+                    return (
+                        <rect
+                            key={node.id}
+                            x={node.x}
+                            y={node.y}
+                            width={Math.max(node.width, 2)}
+                            height={Math.max(node.height, 2)}
+                            fill={{
+                                text: '#9ca3af',
+                                image: '#3b82f6',
+                                video: '#8b5cf6',
+                                audio: '#10b981'
+                            }[node.type] || '#6b7280'}
+                            rx={2}
+                            className={`transition-all duration-150 ${
+                                isClicked ? 'opacity-100 scale-105' : 
+                                isHovered ? 'opacity-90 scale-102' : 
+                                'opacity-80'
+                            }`}
+                            style={{
+                                filter: isClicked ? 'drop-shadow(0 0 4px rgba(0,0,0,0.3))' : 
+                                        isHovered ? 'drop-shadow(0 0 2px rgba(0,0,0,0.2))' : 'none'
+                            }}
+                        />
+                    );
+                })}
                 
                 {/* 当前视口框 */}
                 <rect
@@ -1547,10 +1642,30 @@ export default function InfiniteCanvasApp() {
   const [showMiniMap, setShowMiniMap] = useState(true); // 导航图显示状态
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 }); // 画布尺寸
 
-  // 导航到指定位置
-  const navigateToPosition = useCallback((newOffset) => {
-    setOffset(newOffset);
-  }, []);
+  // 导航到指定位置（支持平滑动画）
+  const navigateToPosition = useCallback((newOffset, duration = 400) => {
+    const startOffset = { ...offset };
+    const startTime = performance.now();
+    
+    const animate = (currentTime) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // 使用缓动函数实现平滑动画
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+      
+      const currentX = startOffset.x + (newOffset.x - startOffset.x) * easeOutQuart;
+      const currentY = startOffset.y + (newOffset.y - startOffset.y) * easeOutQuart;
+      
+      setOffset({ x: currentX, y: currentY });
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    requestAnimationFrame(animate);
+  }, [offset]);
 
   // 更新画布尺寸
   const updateCanvasSize = useCallback(() => {
