@@ -29,13 +29,7 @@ const apiRequest = async (endpoint, data, method = 'POST', headers = {}) => {
   try {
     // 自动获取API Key
     const apiKey = await getApiKey();
-    
-    console.log('🔑 TTS API Key状态:', {
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey ? apiKey.length : 0,
-      apiKeyPrefix: apiKey ? apiKey.substring(0, 10) + '...' : 'null'
-    });
-    
+      
     // 如果API Key为空，抛出特殊的错误类型
     if (!apiKey) {
       console.warn('⚠️ API Key为空，跳过API请求');

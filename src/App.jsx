@@ -758,6 +758,10 @@ const ProjectMenu = React.memo(({ onClose, episodes, currentEpisodeId, onUpdateN
 
 // 导航图组件
 const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visible = true }) => {
+    // 确保canvasSize是有效的
+    const safeCanvasSize = canvasSize && canvasSize.width > 0 && canvasSize.height > 0 
+        ? canvasSize 
+        : { width: window.innerWidth, height: window.innerHeight };
     const mapRef = useRef(null);
     const [clickedNodeId, setClickedNodeId] = useState(null);
     const [hoveredNodeId, setHoveredNodeId] = useState(null);
@@ -767,6 +771,9 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
         if (!nodes || nodes.length === 0) {
             return { scaleFactor: 0.1, viewportRect: null, nodePositions: [] };
         }
+        
+        // 使用安全的canvasSize
+        const currentCanvasSize = safeCanvasSize;
         
         // 找到所有节点的边界
         const nodeBounds = nodes.map(node => {
@@ -806,8 +813,8 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
         const offsetY = Math.max(0, (mapHeight - contentDisplayHeight) / 2);
         
         // 当前视口在导航图中的位置
-        const viewportWidth = canvasSize.width / scale;
-        const viewportHeight = canvasSize.height / scale;
+        const viewportWidth = currentCanvasSize.width / scale;
+        const viewportHeight = currentCanvasSize.height / scale;
         
         const viewportRect = {
             x: (offset.x / scale + minX) * scaleFactor + offsetX,
@@ -827,7 +834,7 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
         }));
         
         return { scaleFactor, viewportRect, nodePositions, offsetX, offsetY, contentWidth, contentHeight };
-    }, [nodes, offset, scale, canvasSize]);
+    }, [nodes, offset, scale, safeCanvasSize]);
     
     // 检测点击或悬停的节点
     const detectNodeAtPosition = useCallback((clientX, clientY) => {
@@ -899,22 +906,52 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
             const nodeCenterY = originalNode.y + getNodeHeight(originalNode) / 2;
             
             // 计算目标偏移量，使节点中心位于画布中心
-            targetX = -nodeCenterX * scale + canvasSize.width / 2;
-            targetY = -nodeCenterY * scale + canvasSize.height / 2;
-            
+            // 节点通过style={{ left: node.x, top: node.y }}定位
+            // 容器通过transform: translate(offset.x, offset.y) scale(scale)变换，transform-origin是top-left
+            // 节点中心在屏幕上的位置：(offset.x + (node.x + nodeWidth/2) * scale, offset.y + (node.y + nodeHeight/2) * scale)
+            // 要使节点中心位于画布中心：(canvasSize.width/2, canvasSize.height/2)
+            // 因此：
+            // offset.x + (node.x + nodeWidth/2) * scale = canvasSize.width/2
+            // offset.y + (node.y + nodeHeight/2) * scale = canvasSize.height/2
             // 确保节点不会超出屏幕边界
             const nodeWidth = getNodeWidth(originalNode);
             const nodeHeight = getNodeHeight(originalNode);
             
-            // 正确的边界检查：计算节点在画布上的显示边界
-            const nodeLeftBoundary = -nodeCenterX * scale; // 节点左侧边界
-            const nodeRightBoundary = -nodeCenterX * scale + canvasSize.width - nodeWidth * scale; // 节点右侧边界
-            const nodeTopBoundary = -nodeCenterY * scale; // 节点顶部边界
-            const nodeBottomBoundary = -nodeCenterY * scale + canvasSize.height - nodeHeight * scale; // 节点底部边界
+            // 尝试直接使用节点中心位置计算偏移量
+            // 方法1：节点中心在屏幕上的位置应该等于画布中心
+            // 节点中心在屏幕上的位置：(offset.x + (node.x + nodeWidth/2) * scale, offset.y + (node.y + nodeHeight/2) * scale)
+            // 解得：
+            // offset.x = canvasSize.width/2 - (node.x + nodeWidth/2) * scale
+            // offset.y = canvasSize.height/2 - (node.y + nodeHeight/2) * scale
+            const calcX = safeCanvasSize.width / 2 - (originalNode.x + nodeWidth / 2) * scale;
+            const calcY = safeCanvasSize.height / 2 - (originalNode.y + nodeHeight / 2) * scale;
+            
+            // 方法2：尝试使用不同的计算方式，考虑可能的偏移问题
+            // 如果节点仍然偏左，可能是我们的计算方式有问题
+            // 尝试一种不同的方法：直接计算节点中心应该在的位置，然后反向推导偏移量
+            const nodeCenterScreenX = originalNode.x * scale + nodeWidth * scale / 2;
+            const nodeCenterScreenY = originalNode.y * scale + nodeHeight * scale / 2;
+            
+            targetX = safeCanvasSize.width / 2 - nodeCenterScreenX;
+            targetY = safeCanvasSize.height / 2 - nodeCenterScreenY;
+            
+            // 保存两种计算结果用于调试
+            const method1Result = {x: calcX, y: calcY};
+            const method2Result = {x: targetX, y: targetY};
+            
+            // 重新计算边界，确保节点在视口内完全可见
+            // 考虑到transform的效果，节点左上角在视口中的位置是：(offset.x + node.x * scale, offset.y + node.y * scale)
+            // 节点右下角在视口中的位置是：(offset.x + (node.x + nodeWidth) * scale, offset.y + (node.y + nodeHeight) * scale)
+            
+            // 为了确保节点完全可见，我们需要限制offset的范围
+            const minOffsetX = -originalNode.x * scale; // 节点左边缘与视口左边缘对齐
+            const maxOffsetX = safeCanvasSize.width - (originalNode.x + nodeWidth) * scale; // 节点右边缘与视口右边缘对齐
+            const minOffsetY = -originalNode.y * scale; // 节点上边缘与视口上边缘对齐
+            const maxOffsetY = safeCanvasSize.height - (originalNode.y + nodeHeight) * scale; // 节点下边缘与视口下边缘对齐
             
             // 确保目标位置在有效范围内
-            targetX = Math.max(nodeLeftBoundary, Math.min(nodeRightBoundary, targetX));
-            targetY = Math.max(nodeTopBoundary, Math.min(nodeBottomBoundary, targetY));
+            targetX = Math.max(minOffsetX, Math.min(maxOffsetX, targetX));
+            targetY = Math.max(minOffsetY, Math.min(maxOffsetY, targetY));
             
             // 调试信息
             console.log('导航图点击调试:', {
@@ -922,20 +959,49 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
                 originalNodePos: {x: originalNode.x, y: originalNode.y},
                 nodeCenter: {x: nodeCenterX, y: nodeCenterY},
                 targetOffset: {x: targetX, y: targetY},
-                canvasSize: canvasSize,
-                scale: scale
+                nodeSize: {width: nodeWidth, height: nodeHeight},
+                canvasSize: safeCanvasSize,
+                originalCanvasSize: canvasSize,
+                scale: scale,
+                currentOffset: {x: offset.x, y: offset.y},
+                boundaries: {minOffsetX, maxOffsetX, minOffsetY, maxOffsetY},
+                comparison: {
+                    method1: method1Result,
+                    method2: method2Result,
+                    difference: {
+                        x: method2Result.x - method1Result.x,
+                        y: method2Result.y - method1Result.y
+                    }
+                },
+                calculation: {
+                    method1_calc: {
+                        x: `safeCanvasSize.width / 2 - (originalNode.x + nodeWidth/2) * scale = ${safeCanvasSize.width / 2} - (${originalNode.x} + ${nodeWidth/2}) * ${scale}`,
+                        y: `safeCanvasSize.height / 2 - (originalNode.y + nodeHeight/2) * scale = ${safeCanvasSize.height / 2} - (${originalNode.y} + ${nodeHeight/2}) * ${scale}`
+                    },
+                    method2_calc: {
+                        x: `safeCanvasSize.width / 2 - nodeCenterScreenX = ${safeCanvasSize.width / 2} - ${nodeCenterScreenX}`,
+                        y: `safeCanvasSize.height / 2 - nodeCenterScreenY = ${safeCanvasSize.height / 2} - ${nodeCenterScreenY}`
+                    },
+                    expectedNodeScreenPos: {
+                        x: `targetX + nodeCenterScreenX = ${targetX} + ${nodeCenterScreenX} = ${targetX + nodeCenterScreenX}`,
+                        y: `targetY + nodeCenterScreenY = ${targetY} + ${nodeCenterScreenY} = ${targetY + nodeCenterScreenY}`
+                    }
+                }
             });
+            
         } else {
             // 点击空白区域，将点击位置居中
             const rect = mapRef.current.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const clickY = e.clientY - rect.top;
             
+            // 将导航图上的点击位置转换为画布坐标
             const canvasX = (clickX - currentTransformations.offsetX) / currentTransformations.scaleFactor;
             const canvasY = (clickY - currentTransformations.offsetY) / currentTransformations.scaleFactor;
             
-            targetX = -canvasX * scale + canvasSize.width / 2;
-            targetY = -canvasY * scale + canvasSize.height / 2;
+            // 使用与节点点击相同的计算逻辑
+            targetX = safeCanvasSize.width / 2 - canvasX * scale;
+            targetY = safeCanvasSize.height / 2 - canvasY * scale;
         }
         
         // 设置点击的节点ID（如果有）
@@ -1640,7 +1706,7 @@ export default function InfiniteCanvasApp() {
   const [networkError, setNetworkError] = useState(false);
   const [showApiTest, setShowApiTest] = useState(false);
   const [showMiniMap, setShowMiniMap] = useState(true); // 导航图显示状态
-  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 }); // 画布尺寸
+  const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight }); // 画布尺寸，初始值设为窗口大小
 
   // 导航到指定位置（支持平滑动画）
   const navigateToPosition = useCallback((newOffset, duration = 400) => {
@@ -1766,7 +1832,6 @@ export default function InfiniteCanvasApp() {
   }, [setShowApiKeyModal, setNetworkError]);
 
   const generateImage = useCallback(async (prompt, model = 'nano-banana', ratio = '4:3') => { 
-      console.log('🎨 App.jsx generateImage调用:', { prompt, model, ratio });
       try { 
           const imageData = await apiClient.generateImage(prompt, model, ratio); 
           return imageData; 
@@ -1781,7 +1846,6 @@ export default function InfiniteCanvasApp() {
   }, [setShowApiKeyModal, setNetworkError]);
 
   const generateImageFromRef = useCallback(async (prompt, refImg, model = 'nano-banana', ratio = '4:3') => { 
-      console.log('🎨 App.jsx generateImageFromRef调用:', { prompt, model, ratio, hasRefImage: !!refImg });
       if (!refImg) return null; 
       try { 
           const imageData = await apiClient.generateImageFromRef(prompt, refImg, model, ratio); 
@@ -1901,7 +1965,6 @@ export default function InfiniteCanvasApp() {
 
   // Template selection handler
   const handleSelectTemplate = useCallback((templateId) => {
-    console.log('Selected template:', templateId);
     // 这里可以添加根据模板ID创建相应节点结构的逻辑
     // 例如：根据模板创建预设的节点和连接
     setShowTemplateList(false);

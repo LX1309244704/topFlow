@@ -31,7 +31,6 @@ export const generateVideo = async (prompt, model, images, aspectRatio, duration
     return await generateVeo3Video(prompt, model, images, aspectRatio, 8);
   } else {
     // 默认使用Sora2
-    console.warn(`未知的视频模型: ${model}，使用默认的Sora2服务`);
     return await generateSora2Video(prompt, 'sora2', images, aspectRatio, duration);
   }
 };

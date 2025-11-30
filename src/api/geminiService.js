@@ -32,7 +32,6 @@ const apiRequest = async (endpoint, data, method = 'POST', headers = {}) => {
     
     // 如果API Key为空，抛出特殊的错误类型
     if (!apiKey) {
-      console.warn('⚠️ API Key为空，跳过API请求');
       const error = new Error('API Key未配置，请点击左下角"API Key"按钮进行配置');
       error.code = 'API_KEY_MISSING';
       throw error;
