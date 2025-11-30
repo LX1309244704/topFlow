@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { 
   Plus, Image as ImageIcon, Zap, ChevronDown, ChevronRight, Minus, Layers, Wand2, X, Mountain, FolderKanban, 
   Type, Video, Music, Play, FileText, Mic, Copy, Square, Sparkles, Link as LinkIcon, LayoutTemplate,
-  RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock
+  RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock, Map
 } from 'lucide-react';
 import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
@@ -756,6 +756,178 @@ const ProjectMenu = React.memo(({ onClose, episodes, currentEpisodeId, onUpdateN
     );
 });
 
+// 导航图组件
+const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visible = true }) => {
+    const mapRef = useRef(null);
+    
+    // 计算画布边界和缩放比例
+    const getMapTransformations = useCallback(() => {
+        if (!nodes || nodes.length === 0) {
+            return { scaleFactor: 0.1, viewportRect: null, nodePositions: [] };
+        }
+        
+        // 找到所有节点的边界
+        const nodeBounds = nodes.map(node => {
+            const width = getNodeWidth(node);
+            const height = getNodeHeight(node);
+            return {
+                x: node.x,
+                y: node.y,
+                width,
+                height,
+                id: node.id,
+                type: node.type
+            };
+        });
+        
+        const minX = Math.min(...nodeBounds.map(b => b.x));
+        const maxX = Math.max(...nodeBounds.map(b => b.x + b.width));
+        const minY = Math.min(...nodeBounds.map(b => b.y));
+        const maxY = Math.max(...nodeBounds.map(b => b.y + b.height));
+        
+        const contentWidth = Math.max(maxX - minX, 1000);
+        const contentHeight = Math.max(maxY - minY, 800);
+        
+        // 导航图尺寸
+        const mapWidth = 200;
+        const mapHeight = 150;
+        
+        // 计算缩放比例，确保所有内容都能在导航图中显示
+        const scaleX = mapWidth / contentWidth;
+        const scaleY = mapHeight / contentHeight;
+        const scaleFactor = Math.min(scaleX, scaleY, 0.15); // 最大缩放15%
+        
+        // 计算在导航图中的位置偏移，使内容居中显示
+        const contentDisplayWidth = contentWidth * scaleFactor;
+        const contentDisplayHeight = contentHeight * scaleFactor;
+        const offsetX = Math.max(0, (mapWidth - contentDisplayWidth) / 2);
+        const offsetY = Math.max(0, (mapHeight - contentDisplayHeight) / 2);
+        
+        // 当前视口在导航图中的位置
+        const viewportWidth = canvasSize.width / scale;
+        const viewportHeight = canvasSize.height / scale;
+        
+        const viewportRect = {
+            x: (offset.x / scale + minX) * scaleFactor + offsetX,
+            y: (offset.y / scale + minY) * scaleFactor + offsetY,
+            width: (viewportWidth * scaleFactor),
+            height: (viewportHeight * scaleFactor)
+        };
+        
+        // 节点在导航图中的位置
+        const nodePositions = nodeBounds.map(bound => ({
+            id: bound.id,
+            type: bound.type,
+            x: (bound.x - minX) * scaleFactor + offsetX,
+            y: (bound.y - minY) * scaleFactor + offsetY,
+            width: bound.width * scaleFactor,
+            height: bound.height * scaleFactor
+        }));
+        
+        return { scaleFactor, viewportRect, nodePositions, offsetX, offsetY, contentWidth, contentHeight };
+    }, [nodes, offset, scale, canvasSize]);
+    
+    const handleMapClick = useCallback((e) => {
+        if (!mapRef.current) return;
+        
+        const rect = mapRef.current.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+        
+        const transformations = getMapTransformations();
+        if (!transformations.viewportRect) return;
+        
+        // 检查是否点击了某个节点
+        let clickedNode = null;
+        for (const nodePos of transformations.nodePositions) {
+            if (clickX >= nodePos.x && clickX <= nodePos.x + nodePos.width &&
+                clickY >= nodePos.y && clickY <= nodePos.y + nodePos.height) {
+                clickedNode = nodePos;
+                break;
+            }
+        }
+        
+        let targetX, targetY;
+        
+        if (clickedNode) {
+            // 点击了节点，将节点中心居中显示
+            const nodeCenterX = (clickedNode.x + clickedNode.width / 2 - transformations.offsetX) / transformations.scaleFactor;
+            const nodeCenterY = (clickedNode.y + clickedNode.height / 2 - transformations.offsetY) / transformations.scaleFactor;
+            
+            targetX = -nodeCenterX * scale + canvasSize.width / 2;
+            targetY = -nodeCenterY * scale + canvasSize.height / 2;
+        } else {
+            // 点击空白区域，将点击位置居中
+            const canvasX = (clickX - transformations.offsetX) / transformations.scaleFactor;
+            const canvasY = (clickY - transformations.offsetY) / transformations.scaleFactor;
+            
+            targetX = -canvasX * scale + canvasSize.width / 2;
+            targetY = -canvasY * scale + canvasSize.height / 2;
+        }
+        
+        onNavigate({ x: targetX, y: targetY });
+    }, [getMapTransformations, scale, canvasSize, onNavigate]);
+    
+    const transformations = getMapTransformations();
+    
+    if (!visible || !transformations.viewportRect) return null;
+    
+    return (
+        <div 
+            ref={mapRef}
+            className="absolute bottom-24 right-4 z-[100] bg-white/90 backdrop-blur-sm rounded-lg shadow-lg cursor-pointer hover:bg-white/95 transition-all duration-200"
+            style={{ width: '200px', height: '140px' }}
+            onClick={handleMapClick}
+            title="点击节点导航到画布位置"
+        >
+            <svg width="100%" height="100%" className="rounded-md">
+                {/* 简洁背景 */}
+                <rect 
+                    x={0} 
+                    y={0} 
+                    width="100%" 
+                    height="100%" 
+                    fill="#f8fafc" 
+                    rx="6"
+                />
+                
+                {/* 节点 */}
+                {transformations.nodePositions.map(node => (
+                    <rect
+                        key={node.id}
+                        x={node.x}
+                        y={node.y}
+                        width={Math.max(node.width, 2)}
+                        height={Math.max(node.height, 2)}
+                        fill={{
+                            text: '#9ca3af',
+                            image: '#3b82f6',
+                            video: '#8b5cf6',
+                            audio: '#10b981'
+                        }[node.type] || '#6b7280'}
+                        rx={2}
+                        className="transition-all duration-150 hover:opacity-80"
+                    />
+                ))}
+                
+                {/* 当前视口框 */}
+                <rect
+                    x={transformations.viewportRect.x}
+                    y={transformations.viewportRect.y}
+                    width={transformations.viewportRect.width}
+                    height={transformations.viewportRect.height}
+                    fill="rgba(59, 130, 246, 0.1)"
+                    stroke="#3b82f6"
+                    strokeWidth="1"
+                    strokeDasharray="2,2"
+                />
+            </svg>
+            
+
+        </div>
+    );
+});
+
 // 保存模板的模态框组件
 const SaveTemplateModal = React.memo(({ onClose, onSave, projectData }) => {
     const [templateName, setTemplateName] = useState('');
@@ -1372,6 +1544,34 @@ export default function InfiniteCanvasApp() {
   const [showTemplateList, setShowTemplateList] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [showApiTest, setShowApiTest] = useState(false);
+  const [showMiniMap, setShowMiniMap] = useState(true); // 导航图显示状态
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 }); // 画布尺寸
+
+  // 导航到指定位置
+  const navigateToPosition = useCallback((newOffset) => {
+    setOffset(newOffset);
+  }, []);
+
+  // 更新画布尺寸
+  const updateCanvasSize = useCallback(() => {
+    if (containerRef.current) {
+      const { width, height } = containerRef.current.getBoundingClientRect();
+      setCanvasSize({ width, height });
+    }
+  }, []);
+
+  // 组件挂载时初始化画布尺寸
+  useEffect(() => {
+    updateCanvasSize();
+    
+    // 监听窗口大小变化
+    const handleResize = () => {
+      updateCanvasSize();
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [updateCanvasSize]);
 
   // API Key验证函数
   const validateApiKey = useCallback((key) => {
@@ -1736,7 +1936,7 @@ export default function InfiniteCanvasApp() {
     
     handleUpdateWorkflowFixed(prevNodes => {
         const newNodes = [...prevNodes];
-        const GRID_W = 480, START_X = 100, START_Y = 100, MAX_PER_ROW = 4, VERTICAL_SPACING = 80, HORIZONTAL_SPACING = 30;
+        const GRID_W = 480, START_X = 100, START_Y = 100, MAX_PER_ROW = 8, VERTICAL_SPACING = 80, HORIZONTAL_SPACING = 30;
         
         // 从左到右排列，每行最多4个，添加水平间隔
         let currentX = START_X;
@@ -1970,7 +2170,7 @@ export default function InfiniteCanvasApp() {
         </div>
       )}
       
-      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={(e) => { e.preventDefault(); setOffset(p => ({ x: p.x, y: p.y - e.deltaY })); }} tabIndex={0}>
+      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={(e) => { if (e.cancelable) { e.preventDefault(); } setOffset(p => ({ x: p.x, y: p.y - e.deltaY })); }} tabIndex={0}>
          <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#d1d5db 1.5px, transparent 1.5px)', opacity: 0.6 }} />
          <div className="absolute inset-0 origin-top-left will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
             <svg className="absolute inset-0 overflow-visible pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
@@ -1986,7 +2186,18 @@ export default function InfiniteCanvasApp() {
          </div>
          {dragState?.type === 'select' && <div style={{ position: 'fixed', left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', zIndex: 9999, pointerEvents: 'none' }} />}
          <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto"><Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button></div>
-         <div className="absolute bottom-6 right-4 z-[100] pointer-events-auto"><Button variant="secondary" icon={LayoutTemplate} onClick={handleAutoLayout} className="bg-white shadow-lg border-gray-300">自动整理</Button></div>
+         <div className="absolute bottom-6 right-4 z-[100] pointer-events-auto flex gap-2">
+           <Button 
+             variant="secondary" 
+             icon={Map} 
+             onClick={() => setShowMiniMap(!showMiniMap)}
+             className={`shadow-lg border-gray-300 transition-colors ${showMiniMap ? 'bg-blue-50 text-blue-600' : 'bg-white'}`}
+             title="显示/隐藏导航图"
+           >
+             导航图
+           </Button>
+           <Button variant="secondary" icon={LayoutTemplate} onClick={handleAutoLayout} className="bg-white shadow-lg border-gray-300">自动整理</Button>
+         </div>
          
          {/* 右上角保存模板按钮 */}
          <div className="absolute top-6 right-4 z-[100] pointer-events-auto">
@@ -2005,6 +2216,16 @@ export default function InfiniteCanvasApp() {
          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
            双击连线删除 • Shift+框选移动
          </div>
+         
+         {/* 导航图 */}
+         <MiniMap 
+           nodes={nodes} 
+           offset={offset} 
+           scale={scale} 
+           canvasSize={canvasSize}
+           onNavigate={navigateToPosition}
+           visible={showMiniMap}
+         />
       </div>
     </div>
   );
