@@ -581,6 +581,15 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
 
   const handleGenerate = useCallback(async (e) => {
     e.stopPropagation();
+    
+    // 检查API Key是否有效
+    if (!apiFunctions.checkApiKeyBeforeGenerate) {
+      console.warn('API Key检查函数未找到，跳过验证');
+    } else if (!apiFunctions.checkApiKeyBeforeGenerate()) {
+      console.log('API Key验证失败，停止生成操作');
+      return;
+    }
+    
     const prompt = promptFromSource;
     let referenceImage = null; 
     let referenceImages = []; 
@@ -1238,18 +1247,16 @@ const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onClear }) 
     const inputRef = useRef(null);
     useEffect(() => { if (inputRef.current) inputRef.current.focus(); }, []);
 
-    // 从第三方API获取Key
-    const handleFetchKey = async () => {
-        setIsLoadingKey(true);
-        try {
-            const apiKey = await apiClient.getApiKey();
-            setTempKey(apiKey);
-        } catch (error) {
-            console.error('获取API Key失败:', error);
-            alert('获取API Key失败，请稍后重试');
-        } finally {
-            setIsLoadingKey(false);
-        }
+    // 打开API Key获取网站
+    const handleFetchKey = () => {
+        // 创建临时锚点链接并点击
+        const link = document.createElement('a');
+        link.href = 'https://ai.jmyps.com/';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -1268,14 +1275,14 @@ const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onClear }) 
                             placeholder="AIzaSy..." 
                             className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm" 
                         />
-                        <Button 
-                            onClick={handleFetchKey} 
-                            disabled={isLoadingKey} 
-                            variant="secondary" 
-                            className="whitespace-nowrap"
+                        <a 
+                            href="https://ai.jmyps.com/" 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm active:scale-95 select-none bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 whitespace-nowrap"
                         >
-                            {isLoadingKey ? '获取中...' : '获取Key'}
-                        </Button>
+                            获取Key
+                        </a>
                     </div>
                 </div>
                 <div className="flex justify-between items-center pt-3 border-t border-gray-100">
@@ -1384,6 +1391,47 @@ export default function InfiniteCanvasApp() {
   const [showTemplateList, setShowTemplateList] = useState(false);
   const [networkError, setNetworkError] = useState(false);
   const [showApiTest, setShowApiTest] = useState(false);
+
+  // API Key验证函数
+  const validateApiKey = useCallback((key) => {
+    console.log('🔑 验证API Key:', key ? key.substring(0, 10) + '...' : '空');
+    
+    if (!key || key.trim() === '') {
+      console.log('❌ API Key为空');
+      return { isValid: false, reason: 'API Key不能为空' };
+    }
+    
+    // 简化验证逻辑，只检查基本格式
+    if (key.length < 5) {
+      console.log('❌ API Key长度太短');
+      return { isValid: false, reason: 'API Key格式不正确，长度太短' };
+    }
+    
+    // 放宽格式检查，只要有内容就认为可能有效
+    if (key.trim().length === 0) {
+      console.log('❌ API Key为纯空白字符');
+      return { isValid: false, reason: 'API Key不能为空白字符' };
+    }
+    
+    console.log('✅ API Key验证通过');
+    return { isValid: true, reason: '' };
+  }, []);
+
+  // 检查是否需要显示API Key配置模态框
+  const checkApiKeyBeforeGenerate = useCallback(() => {
+    console.log('🔍 开始检查API Key...');
+    console.log('🔑 当前userApiKey:', userApiKey ? '有值' : '空');
+    
+    const validation = validateApiKey(userApiKey);
+    if (!validation.isValid) {
+      console.log('⚠️ API Key无效，显示配置模态框');
+      setShowApiKeyModal(true);
+      return false;
+    }
+    
+    console.log('✅ API Key检查通过，允许生成');
+    return true;
+  }, [userApiKey, validateApiKey]);
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
 
@@ -1528,7 +1576,7 @@ export default function InfiniteCanvasApp() {
     } 
   }, [setShowApiKeyModal, setNetworkError]);
 
-  const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, handleTextNodeAnalysis]);
+  const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis, checkApiKeyBeforeGenerate }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, handleTextNodeAnalysis, checkApiKeyBeforeGenerate]);
   
   // Helper functions for handlers
   const updateNode = useCallback((id, newData) => handleUpdateWorkflowFixed(ns => ns.map(n => n.id === id ? { ...n, ...newData } : n)), [handleUpdateWorkflowFixed]);
@@ -1601,6 +1649,14 @@ export default function InfiniteCanvasApp() {
   const handleSpawnNodes = useCallback(async (sourceId, prompt, refImg) => {
     const srcNode = nodes.find(n => n.id === sourceId);
     if (!srcNode) return;
+    
+    // 检查API Key是否有效
+    if (!apiFunctions.checkApiKeyBeforeGenerate) {
+      console.warn('API Key检查函数未找到，跳过验证');
+    } else if (!apiFunctions.checkApiKeyBeforeGenerate()) {
+      console.log('API Key验证失败，停止批量生成操作');
+      return;
+    }
     
     // 使用优化后的createBatchNodes函数
     const { newNodes, newEdges } = createBatchNodes(srcNode, srcNode.data.batchSize || 1, nodes, edges);

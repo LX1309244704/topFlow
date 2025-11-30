@@ -33,6 +33,15 @@ const NodeCard = React.memo(({
 
   const handleGenerate = useCallback(async (e) => {
     e.stopPropagation();
+    
+    // 检查API Key是否有效
+    if (!apiFunctions.checkApiKeyBeforeGenerate) {
+      console.warn('API Key检查函数未找到，跳过验证');
+    } else if (!apiFunctions.checkApiKeyBeforeGenerate()) {
+      console.log('API Key验证失败，停止生成操作');
+      return;
+    }
+    
     const prompt = promptFromSource;
     let referenceImage = null; 
     let referenceImages = []; 

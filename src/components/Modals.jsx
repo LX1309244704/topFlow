@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Plus, X, Key, Save, BookOpenText, Pencil, Trash2, FileText, FolderKanban, Users, ImageIcon,
   LayoutTemplate, Search, ChevronRight, ChevronDown, TestTube, Mountain, Sparkles, Video, Play, Zap
@@ -83,11 +83,7 @@ export const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onCl
     if (inputRef.current) inputRef.current.focus(); 
   }, []);
 
-  // 添加获取API Key的函数
-  const handleGetKey = () => {
-    // 打开新窗口访问API Key获取网站
-    window.open('https://ai.jmyps.com/', '_blank');
-  };
+
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={onClose}>
@@ -114,9 +110,9 @@ export const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onCl
         </div>
         <div className="flex justify-between items-center pt-3 border-t border-gray-100">
           <div className="flex gap-2">
-            <Button onClick={handleGetKey} variant="secondary" className="bg-green-50 text-green-600 hover:bg-green-100 border-green-200">
+            <a href="https://ai.jmyps.com/" target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-4 py-2 bg-green-50 text-green-600 hover:bg-green-100 border border-green-200 rounded-lg text-sm font-medium transition-colors">
               获取 Key
-            </Button>
+            </a>
             <Button onClick={() => {onClear(); setTempKey(""); onClose();}} variant="secondary" icon={Trash2} className="text-red-500 bg-red-50 hover:bg-red-100 border-red-200">
               清除
             </Button>
