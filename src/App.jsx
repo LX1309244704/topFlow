@@ -7,6 +7,7 @@ import {
 import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
 import { AudioContent } from './components/NodeContent.jsx';
+import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 
 // --- Global API Key ---
 const apiKey = ""; 
@@ -299,6 +300,12 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
       
       // 保存当前文本内容
       const originalText = node.data.text || '';
+      const selectedModel = node.data.model || "gemini-2.5-pro";
+      const selectedRole = node.data.role || "storyboard-expert";
+      const rolePrompt = getRolePrompt(selectedRole);
+      
+      // 调试：打印选中的模型和角色
+      console.log('文本续写 - 选择的模型:', selectedModel, '选择的角色:', selectedRole, '节点数据:', node.data);
       
       // 重置状态
       updateNode(node.id, { data: { ...node.data, isWriting: true, streamingText: '' } });
@@ -311,7 +318,7 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
         typingIntervalRef.current = null;
       }
       
-      const prompt = `请续写以下故事或剧本（使用中文）：${originalText}`;
+      const prompt = `${rolePrompt}\n\n请续写以下故事或剧本（使用中文）：${originalText}`;
       
       // 使用流式API获取内容
       let accumulatedText = '';
@@ -327,7 +334,7 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
             } 
           });
         }
-      });
+      }, selectedModel);
       
       // 完成后将流式内容添加到原文本
       updateNode(node.id, { 
@@ -349,10 +356,17 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
       }
   };
   
-  const handleAnalysisClick = async () => {
+const handleAnalysisClick = async () => {
       if (!node.data.text || isWriting || isAnalyzing) return;
-      handleAnalyze(node.data.text);
-  };
+      const selectedModel = node.data.model || "gemini-2.5-pro";
+      const selectedRole = node.data.role || "storyboard-expert";
+      const rolePrompt = getRolePrompt(selectedRole);
+      
+      // 调试：打印选中的模型和角色
+      console.log('文本分析 - 选择的模型:', selectedModel, '选择的角色:', selectedRole, '节点数据:', node.data);
+      
+      handleAnalyze(node.data.text, selectedModel, rolePrompt);
+    };
   
   const handleLocalResize = useCallback((e) => {
     if (!localResizing || !textContentRef.current) return;
@@ -385,8 +399,34 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
 
   const isAiWorking = isAnalyzing || isWriting;
 
+    // 文本模型选项
+  const textModelOptions = [
+    {value: "gemini-2.5-pro", label: "Gemini 2.5 Pro"},
+    {value: "gemini-3-pro", label: "Gemini 3 Pro"}
+  ];
+
+  
+
   return (
     <div ref={textContentRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col cursor-text relative" onClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ height: `${currentHeight}px`, minHeight: `${minHeight}px` }}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <div className="text-xs text-gray-500 font-medium">模型:</div>
+        <NodeSelect 
+          value={node.data.model || "gemini-2.5-pro"} 
+          options={textModelOptions} 
+          onChange={v => updateNode(node.id, { data: { ...node.data, model: v } })} 
+          className="flex-1" 
+        />
+      </div>
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <div className="text-xs text-gray-500 font-medium">角色:</div>
+        <NodeSelect 
+          value={node.data.role || "storyboard-expert"} 
+          options={textRoleOptions} 
+          onChange={v => updateNode(node.id, { data: { ...node.data, role: v } })} 
+          className="flex-1" 
+        />
+      </div>
        <div className="flex-1 p-4 relative group">
          <textarea 
             className="w-full h-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0 leading-relaxed placeholder-gray-300" 
@@ -417,7 +457,7 @@ const TextContent = ({ node, updateNode, generateText, generateStreamText, handl
                 {isAnalyzing ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 分析中...</span> : <span className="flex items-center gap-1"><Search size={10}/> 生成大纲</span>}
             </button>
             <button onClick={handleAIWrite} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-blue-100 disabled:opacity-50" disabled={isAiWorking}>
-                {isWriting ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 续写中...</span> : <span className="flex items-center gap-1"><Sparkles size={10}/> AI 续写</span>}
+                {isWriting ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 续写中...</span> : <span className="flex items-center gap-1"><Sparkles size={10}/> AI 生成</span>}
             </button>
          </div>
        </div>
@@ -708,6 +748,8 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
   const headerIcon = { image: ImageIcon, video: Video, audio: Music, text: FileText }[node.type];
   const headerLabel = { image: "Image", video: "Video", audio: "Audio", text: "Text" }[node.type];
   const headerColor = { image: "text-blue-500", video: "text-blue-500", audio: "text-blue-500", text: "text-gray-500" }[node.type];
+
+  
 
   return (
     <div className={`absolute flex flex-col transition-shadow duration-200 ease-out group rounded-2xl ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} onMouseDown={handleMouseDown}>
@@ -1818,9 +1860,9 @@ export default function InfiniteCanvasApp() {
     } 
   }, [setShowApiKeyModal, setNetworkError]);
 
-  const generateStructuredSynopsis = useCallback(async (script) => { 
+  const generateStructuredSynopsis = useCallback(async (script, model = "gemini-2.5-pro", rolePrompt = "") => { 
     try { 
-      const result = await apiClient.generateStructuredSynopsis(script); 
+      const result = await apiClient.generateStructuredSynopsis(script, model, rolePrompt); 
       return result; 
     } catch (e) { 
       // 如果是API Key缺失错误，显示API Key配置模态框
@@ -1914,17 +1956,17 @@ export default function InfiniteCanvasApp() {
   const handleUpdateWorkflowFixed = handleUpdateWorkflow;
 
   // API Consumers requiring state update
-  const handleTextNodeAnalysis = useCallback(async (script, nodeId) => {
+  const handleTextNodeAnalysis = useCallback(async (script, nodeId, model = "gemini-2.5", rolePrompt = "") => {
     handleUpdateWorkflowFixed(prevNodes => prevNodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isAnalyzing: true } } : n));
-    const result = await generateStructuredSynopsis(script);
+    const result = await generateStructuredSynopsis(script, model, rolePrompt);
     setSynopsisData(result);
     handleUpdateWorkflowFixed(prevNodes => prevNodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isAnalyzing: false } } : n));
   }, [generateStructuredSynopsis, handleUpdateWorkflowFixed]); 
 
   // 首先导入generateStreamText
-  const generateStreamText = useCallback(async (prompt, onChunk) => { 
+  const generateStreamText = useCallback(async (prompt, onChunk, model) => { 
     try { 
-      const response = await apiClient.generateStreamText(prompt, onChunk); 
+      const response = await apiClient.generateStreamText(prompt, onChunk, model); 
       return response; 
     } catch (e) { 
       console.error('流式文本生成错误:', e);

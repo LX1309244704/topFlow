@@ -312,15 +312,19 @@ export const generateGeminiText = async (prompt) => {
  * @param {Function} onChunk - 处理流数据的回调函数
  * @returns {Promise<string>} 完整的生成文本
  */
-export const generateGeminiStreamText = async (prompt, onChunk) => {
+export const generateGeminiStreamText = async (prompt, onChunk, model = "gemini-2.5-pro") => {
   try {
     let fullText = '';
     let accumulatedText = '';
     
-    // 首先测试API连接性
-    console.log('开始Gemini流式文本生成请求...');
+    // 根据选择的模型确定API端点
+    const modelEndpoint = model === "gemini-3-pro" ? "/v1beta/models/gemini-3-pro-preview:generateContent" : "/v1beta/models/gemini-2.5-pro:streamGenerateContent";
     
-    fullText = await fetchStreamWithRetry('/v1beta/models/gemini-2.5-pro:streamGenerateContent', {
+    // 首先测试API连接性
+    console.log(`开始Gemini流式文本生成请求，使用模型: ${model}`);
+    console.log(`选择的API端点: ${modelEndpoint}`);
+    
+    fullText = await fetchStreamWithRetry(modelEndpoint, {
       systemInstruction: {
         parts: [
           {
@@ -580,9 +584,15 @@ export const generateGeminiImageFromRef = async (prompt, refImage, model = 'nano
  * @param {string} script - 剧本内容
  * @returns {Promise<Object>} 分析结果对象
  */
-export const generateGeminiStructuredSynopsis = async (script) => {
+export const generateGeminiStructuredSynopsis = async (script, model = "gemini-2.5-pro", rolePrompt = "") => {
   try {
     let fullText = '';
+    
+    // 构建系统提示词，优先使用角色提示词
+    const systemInstruction = rolePrompt ? 
+      rolePrompt : 
+      "你是一个专业的剧本分析师，能够分析剧本并提取关键信息。请直接返回JSON格式的数据，不要添加任何前缀或解释文本。";
+    
     const analysisPrompt = `请分析以下剧本，返回一个包含以下字段的JSON对象：
         {
           "synopsis": "剧本概要",
@@ -593,11 +603,14 @@ export const generateGeminiStructuredSynopsis = async (script) => {
         剧本内容：
         ${script}`;
         
-    fullText = await fetchStreamWithRetry('/v1beta/models/gemini-2.5-pro:streamGenerateContent', {
+    // 根据选择的模型确定API端点
+    const modelEndpoint = model === "gemini-3-pro" ? "/v1beta/models/gemini-3-pro-preview:generateContent" : "/v1beta/models/gemini-2.5-pro:streamGenerateContent";
+    
+    fullText = await fetchStreamWithRetry(modelEndpoint, {
       systemInstruction: {
         parts: [
           {
-            text: "你是一个专业的剧本分析师，能够分析剧本并提取关键信息。请直接返回JSON格式的数据，不要添加任何前缀或解释文本。"
+            text: systemInstruction
           }
         ]
       },

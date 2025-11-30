@@ -204,6 +204,7 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
     if (!node.data.text || isWriting || isAnalyzing) return;
     
     const originalText = node.data.text || '';
+    const selectedModel = node.data.model || "gemini-2.5";
     
     updateNode(node.id, { data: { ...node.data, isWriting: true, streamingText: '' } });
     setDisplayText('');
@@ -227,7 +228,7 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
           } 
         });
       }
-    });
+    }, selectedModel);
     
     updateNode(node.id, { 
       data: { 
@@ -249,7 +250,8 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
   
   const handleAnalysisClick = async () => {
     if (!node.data.text || isWriting || isAnalyzing) return;
-    handleAnalyze(node.data.text);
+    const selectedModel = node.data.model || "gemini-2.5";
+    handleAnalyze(node.data.text, selectedModel);
   };
   
   const handleLocalResize = useCallback((e) => {
@@ -282,9 +284,24 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
   }, [localResizing, handleLocalResize, handleLocalResizeEnd]);
 
   const isAiWorking = isAnalyzing || isWriting;
+  
+  // 文本模型选项
+  const textModelOptions = [
+    {value: "gemini-2.5", label: "Gemini 2.5"},
+    {value: "gemini-3", label: "Gemini 3"}
+  ];
 
   return (
     <div ref={textContentRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col cursor-text relative" onClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ height: `${currentHeight}px`, minHeight: `${minHeight}px` }}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
+        <div className="text-xs text-gray-500 font-medium">模型:</div>
+        <NodeSelect 
+          value={node.data.model || "gemini-2.5"} 
+          options={textModelOptions} 
+          onChange={v => updateNode(node.id, { data: { ...node.data, model: v } })} 
+          className="flex-1" 
+        />
+      </div>
       <div className="flex-1 p-4 relative group">
         <textarea 
           className="w-full h-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0 leading-relaxed placeholder-gray-300" 

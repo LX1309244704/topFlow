@@ -50,8 +50,12 @@ export const generateText = async (prompt) => {
  * @param {Function} onChunk - 处理流数据的回调函数
  * @returns {Promise<string>} 完整的生成文本
  */
-export const generateStreamText = async (prompt, onChunk) => {
-  return await generateGeminiStreamText(prompt, onChunk);
+export const generateStreamText = async (prompt, onChunk, model) => {
+  // 如果没有传入模型参数，使用默认值
+  const selectedModel = model || "gemini-2.5-pro";
+  // 调试：打印接收到的模型参数
+  console.log('generateStreamText - 接收到的模型参数:', selectedModel);
+  return await generateGeminiStreamText(prompt, onChunk, selectedModel);
 };
 
 /**
@@ -91,8 +95,8 @@ export const generateTts = async (text) => {
  * @param {string} script - 剧本内容
  * @returns {Promise<Object>} 分析结果对象
  */
-export const generateStructuredSynopsis = async (script) => {
-  return await generateGeminiStructuredSynopsis(script);
+export const generateStructuredSynopsis = async (script, model = "gemini-2.5-pro", rolePrompt = "") => {
+  return await generateGeminiStructuredSynopsis(script, model, rolePrompt);
 };
 
 /**
