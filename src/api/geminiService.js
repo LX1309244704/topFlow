@@ -411,8 +411,7 @@ export const generateGeminiImage = async (prompt, model = 'nano-banana', ratio =
     // 模型映射
     const modelMap = {
       'nano-banana': 'gemini-2.5-flash-image-preview',
-      'nano-banana-pro': 'gemini-3-pro-image-preview',
-      'qwen-image': 'qwen-image-edit-2509'
+      'nano-banana-pro': 'gemini-3-pro-image-preview'
     };
     
     const endpoint = `/v1beta/models/${modelMap[model] || modelMap['nano-banana']}:generateContent`;
@@ -497,8 +496,7 @@ export const generateGeminiImageFromRef = async (prompt, refImage, model = 'nano
     // 模型映射
     const modelMap = {
       'nano-banana': 'gemini-2.5-flash-image-preview',
-      'nano-banana-pro': 'gemini-3-pro-image-preview',
-      'qwen-image': 'qwen-image-edit-2509'
+      'nano-banana-pro': 'gemini-3-pro-image-preview'
     };
     
     console.log('🔧 Gemini模型映射检查:', {

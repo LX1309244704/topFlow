@@ -137,7 +137,6 @@ const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
   const modelOptions = [
     { value: "nano-banana", label: "Nano Banana" },
     { value: "nano-banana-pro", label: "Nano Banana Pro" },
-    { value: "qwen-image", label: "qwen-image" },
   ];
   const fileRef = useRef(null);
 
