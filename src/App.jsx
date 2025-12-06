@@ -8,6 +8,69 @@ import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
 import { AudioContent } from './components/NodeContent.jsx';
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
+import { AssetModal, SaveProjectModal, ProjectMenu } from './components/Modals.jsx';
+import { Sidebar } from './components/Sidebar.jsx';
+import { CreationMenu } from './components/TemplateComponents.jsx';
+import { indexedDBManager } from './utils/indexedDB';
+import { NotificationContainer, useNotification } from './components/Notification.jsx';
+
+// 提取视频最后一帧的函数
+const extractLastFrameFromVideo = async (videoUrl) => {
+  return new Promise((resolve) => {
+    try {
+      // 创建一个临时的video元素
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous'; // 允许跨域
+      video.src = videoUrl;
+      
+      // 设置静音以避免自动播放被阻止
+      video.muted = true;
+      video.autoplay = false;
+      
+      // 当视频元数据加载完成时
+      video.addEventListener('loadedmetadata', () => {
+        // 跳转到视频的最后一秒（接近结束）
+        video.currentTime = Math.max(0, video.duration - 0.1);
+        
+        // 当视频时间更新时（到达最后一帧）
+        video.addEventListener('seeked', () => {
+          // 创建一个canvas来绘制视频帧
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          // 设置canvas尺寸为视频尺寸
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          
+          // 绘制当前视频帧到canvas
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          
+          // 将canvas转换为DataURL格式的图片
+          const imageDataUrl = canvas.toDataURL('image/png');
+          
+          // 清理临时元素
+          video.remove();
+          
+          resolve(imageDataUrl);
+        }, { once: true });
+      });
+      
+      // 处理加载错误
+      video.addEventListener('error', (error) => {
+        console.error('视频加载失败:', error);
+        video.remove();
+        resolve(null);
+      });
+      
+      // 开始加载视频
+      video.load();
+      
+    } catch (error) {
+      console.error('提取视频最后一帧失败:', error);
+      resolve(null);
+    }
+  });
+};
 
 // --- Global API Key ---
 const apiKey = ""; 
@@ -456,7 +519,7 @@ const handleAnalysisClick = async () => {
                 {isAnalyzing ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 分析中...</span> : <span className="flex items-center gap-1"><Search size={10}/> 生成大纲</span>}
             </button>
             <button onClick={handleAIWrite} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-blue-100 disabled:opacity-50" disabled={isAiWorking}>
-                {isWriting ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 续写中...</span> : <span className="flex items-center gap-1"><Sparkles size={10}/> AI 生成</span>}
+                {isWriting ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 生成中...</span> : <span className="flex items-center gap-1"><Sparkles size={10}/> AI 生成</span>}
             </button>
          </div>
        </div>
@@ -472,7 +535,7 @@ const handleAnalysisClick = async () => {
   );
 };
 
-const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
+const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, videoInputs, generateText }) => {
   const videoModelOptions = [
     {value:"sora2",label:"Sora 2.0"}, 
     {value:"veo_3_1-fast",label:"veo_3_1-fast"}
@@ -496,13 +559,18 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
   };
 
   const imageCount = imageInputs.length;
+  const videoCount = videoInputs.length;
   const currentModel = node.data.model || 'sora2';
   
   // 根据不同模型显示不同的输入状态
   let inputStatusText = '文生视频模式 (T2V)';
   let inputStatusColor = 'text-gray-500';
   
-  if (currentModel === 'veo_3_1-fast' && imageCount === 2) {
+  if (videoCount > 0) {
+    // 视频节点连接模式：提取最后一帧作为首帧
+    inputStatusText = `视频续帧模式 (${videoCount} 视频)`;
+    inputStatusColor = 'text-green-500';
+  } else if (currentModel === 'veo_3_1-fast' && imageCount === 2) {
     inputStatusText = '首尾帧生视频模式 (首尾帧)';
     inputStatusColor = 'text-purple-500';
   } else if (currentModel === 'veo3.1-components' && imageCount <= 3 && imageCount > 0) {
@@ -584,6 +652,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
 
   const promptInputNode = linkedSources.textInput;
   const imageInputNodes = linkedSources.imageInputs;
+  const videoInputNodes = linkedSources.videoInputs;
   const promptFromSource = promptInputNode?.data?.text || node.data.prompt;
   const textInputLabel = useMemo(() => promptInputNode ? `节点 #${promptInputNode.id.toString().slice(-4)}` : null, [promptInputNode]);
 
@@ -602,13 +671,31 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
     let referenceImage = null; 
     let referenceImages = []; 
     if (node.type === 'image') {
-        if (imageInputNodes.length > 0) referenceImage = imageInputNodes[0].data.generatedImage;
+        // 支持多张参考图：使用所有连接的图片节点的图片
+        referenceImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
+        // 向后兼容：如果只有一张参考图，使用单参考图模式
+        if (referenceImages.length > 0) referenceImage = referenceImages[0];
         else if (node.data.generatedImage) referenceImage = node.data.generatedImage;
     } else if (node.type === 'video') {
+        // 支持图片节点和视频节点作为输入源
         referenceImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
+        
+        // 处理视频节点输入：提取视频的最后一帧作为参考图
+        if (videoInputNodes.length > 0) {
+            for (const videoNode of videoInputNodes) {
+                if (videoNode.data.videoUrl) {
+                    // 提取视频最后一帧的逻辑
+                    const lastFrameImage = await extractLastFrameFromVideo(videoNode.data.videoUrl);
+                    if (lastFrameImage) {
+                        referenceImages.push(lastFrameImage);
+                    }
+                }
+            }
+        }
     }
     
     const isRefValid = referenceImage && typeof referenceImage === 'string' && referenceImage.startsWith('data:');
+    const areRefsValid = referenceImages.every(img => img && typeof img === 'string' && img.startsWith('data:'));
 
     if ((node.data.batchSize || 1) > 1) {
         if (onSpawnNodes) onSpawnNodes(node.id, prompt, isRefValid ? referenceImage : null); 
@@ -617,7 +704,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
 
     if (node.data.isGenerating) return;
     
-    const hasReference = (node.type === 'image' && referenceImage) || (node.type === 'video' && referenceImages.length > 0);
+    const hasReference = (node.type === 'image' && (referenceImage || referenceImages.length > 0)) || (node.type === 'video' && referenceImages.length > 0);
     updateNode(node.id, { data: { ...node.data, isGenerating: true, usingReference: hasReference } });
 
     try {
@@ -629,7 +716,13 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
             let url = null;
             
             try {
-                if (referenceImage && isRefValid) {
+                // 支持多张参考图：如果有多个参考图，使用多参考图模式
+                if (referenceImages.length > 1 && areRefsValid) {
+                    console.log(`使用多参考图模式，参考图数量: ${referenceImages.length}`);
+                    // 目前API只支持单参考图，这里使用第一张参考图
+                    // 未来可以扩展为支持多参考图的API
+                    url = await apiFunctions.generateImageFromRef(prompt, referenceImages[0], selectedModel, selectedRatio);
+                } else if (referenceImage && isRefValid) {
                     url = await apiFunctions.generateImageFromRef(prompt, referenceImage, selectedModel, selectedRatio);
                 } else {
                     url = await apiFunctions.generateImage(prompt, selectedModel, selectedRatio);
@@ -762,39 +855,12 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
       <div onClick={node.type !== 'text' ? (e) => { e.stopPropagation(); setIsExpanded(true); } : undefined}>
         {node.type === 'text' && <TextContent node={node} updateNode={updateNode} generateText={apiFunctions.generateText} generateStreamText={apiFunctions.generateStreamText} handleAnalyze={(script) => apiFunctions.handleTextNodeAnalysis(script, node.id)} isAnalyzing={node.data.isAnalyzing}/>}
         {node.type === 'image' && <ImageContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} generateText={apiFunctions.generateText}/>}
-        {node.type === 'video' && <VideoContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} imageInputs={linkedSources.imageInputs} generateText={apiFunctions.generateText}/>}
+        {node.type === 'video' && <VideoContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} imageInputs={linkedSources.imageInputs} videoInputs={linkedSources.videoInputs} generateText={apiFunctions.generateText}/>}
         {node.type === 'audio' && <AudioContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} />}
       </div>
       {isExpanded && <button onClick={toggleExpand} className="absolute top-8 right-2 z-50 p-1 bg-white/90 rounded-full hover:bg-white text-gray-400 hover:text-gray-600 shadow-sm"><ChevronDown size={14} className="rotate-180" /></button>}
     </div>
   );
-});
-
-// --- Modals & Menus ---
-// ... (Same as before: ProjectMenu, ApiKeyConfigModal, SynopsisDisplayModal, CreationMenu, Sidebar) ...
-const ProjectMenu = React.memo(({ onClose, episodes, currentEpisodeId, onUpdateName, onAddEpisode, onDeleteEpisode, onSelectEpisode }) => {
-    const [editingId, setEditingId] = useState(null); 
-    const handleModalClick = (e) => e.stopPropagation();
-    const handleInputBlur = useCallback(() => { setEditingId(null); }, []);
-    return (
-        <div className="fixed inset-0 z-[150]" onMouseDown={onClose}> 
-            <div className="absolute inset-0 bg-black/5 pointer-events-none" />
-            <div className="absolute bg-white rounded-2xl shadow-2xl p-6 w-[350px] max-w-full border border-gray-100 animate-in fade-in slide-in-from-left-4 duration-300" style={{ left: '100px', top: '180px' }} onMouseDown={handleModalClick}>
-                <div className="flex justify-between items-center border-b pb-3 mb-4"><h2 className="text-lg font-bold flex items-center gap-2 text-gray-800"><BookOpenText size={20} /> 剧集管理</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button></div>
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-2 mb-4">
-                    {episodes.map((episode) => (
-                        <div key={episode.id} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all duration-150 group ${episode.id === currentEpisodeId ? 'bg-blue-50 border-blue-200 ring-2 ring-blue-100' : 'bg-gray-50 border-gray-100 hover:bg-gray-100'}`} onClick={() => onSelectEpisode(episode.id)}>
-                            <BookOpenText size={16} className={`${episode.id === currentEpisodeId ? 'text-blue-700' : 'text-gray-500'} flex-shrink-0`} />
-                            {editingId === episode.id ? (<input type="text" value={episode.name} onChange={(e) => onUpdateName(episode.id, e.target.value)} onMouseDown={e => e.stopPropagation()} onBlur={handleInputBlur} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingId(null); }}} autoFocus className={`flex-1 bg-transparent text-sm font-medium focus:outline-none focus:ring-0 border-none p-0 ${episode.id === currentEpisodeId ? 'text-blue-800' : 'text-gray-700'}`} />) : (<span className={`flex-1 text-sm font-medium truncate ${episode.id === currentEpisodeId ? 'text-blue-800' : 'text-gray-700'}`}>{episode.name}</span>)}
-                            {editingId !== episode.id && (<button onClick={(e) => { e.stopPropagation(); setEditingId(episode.id); }} onMouseDown={e => e.stopPropagation()} className="text-gray-400 hover:text-blue-500 p-1 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100" title="重命名剧集"><Pencil size={16} /></button>)}
-                            <button onClick={() => onDeleteEpisode(episode.id)} onMouseDown={e => e.stopPropagation()} className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100" title="删除剧集"><Trash2 size={16} /></button>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex justify-between items-center pt-3 border-t border-gray-100"><Button onClick={onAddEpisode} variant="secondary" icon={Plus} className="bg-blue-50 text-blue-600 hover:bg-blue-100 border-blue-200">新增剧集</Button><Button onClick={onClose} variant="primary">完成</Button></div>
-            </div>
-        </div>
-    );
 });
 
 // 导航图组件
@@ -1130,199 +1196,9 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
     );
 });
 
-// 保存模板的模态框组件
-const SaveTemplateModal = React.memo(({ onClose, onSave, projectData }) => {
-    const [templateName, setTemplateName] = useState('');
-    const [templateCategory, setTemplateCategory] = useState('创作');
-    const [templateDescription, setTemplateDescription] = useState('');
-    
-    const categories = ['创作', '故事', '影视', '商业', '教育', '游戏'];
-    
-    const handleSave = () => {
-        if (!templateName.trim()) return;
-        
-        const newTemplate = {
-            id: `custom-${Date.now()}`,
-            icon: BookOpenText,
-            title: templateName,
-            description: templateDescription || '自定义项目模板',
-            category: templateCategory,
-            image: 'https://placehold.co/400x250/6366f1/ffffff?text=' + encodeURIComponent(templateName),
-            color: 'bg-gradient-to-br from-indigo-500 to-indigo-600',
-            nodes: projectData.nodes || [],
-            edges: projectData.edges || []
-        };
-        
-        onSave(newTemplate);
-        onClose();
-    };
-    
-    const handleModalClick = (e) => e.stopPropagation();
-    
-    return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl w-[450px] max-w-full border border-gray-100 animate-in fade-in zoom-in-50 duration-200" onMouseDown={handleModalClick} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center border-b border-gray-100 px-6 py-4">
-                    <h2 className="text-lg font-bold flex items-center gap-2 text-blue-700">
-                        <Save size={20} /> 保存为模板
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                        <X size={20} />
-                    </button>
-                </div>
-                
-                <div className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">模板名称</label>
-                        <input
-                            type="text"
-                            value={templateName}
-                            onChange={(e) => setTemplateName(e.target.value)}
-                            placeholder="请输入模板名称"
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-colors"
-                            autoFocus
-                        />
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">分类</label>
-                        <select
-                            value={templateCategory}
-                            onChange={(e) => setTemplateCategory(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-colors"
-                        >
-                            {categories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">模板描述</label>
-                        <textarea
-                            value={templateDescription}
-                            onChange={(e) => setTemplateDescription(e.target.value)}
-                            placeholder="请输入模板描述（可选）"
-                            rows={3}
-                            className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none transition-colors resize-none"
-                        />
-                    </div>
-                </div>
-                
-                <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                    <Button onClick={onClose} variant="secondary">取消</Button>
-                    <Button onClick={handleSave} variant="primary" disabled={!templateName.trim()}>
-                        保存模板
-                    </Button>
-                </div>
-            </div>
-        </div>
-    );
-});
 
-// 资产模块模态框组件
-const AssetModal = React.memo(({ onClose }) => {
-    const tabs = [
-        { id: 'drafts', label: '项目草稿', icon: FileText },
-        { id: 'assets', label: '项目资产', icon: FolderKanban },
-        { id: 'characters', label: '角色库', icon: Users },
-        { id: 'materials', label: '素材库', icon: ImageIcon }
-    ];
-    
-    const [activeTab, setActiveTab] = useState('drafts');
-    
-    const handleTabClick = (tabId) => {
-        setActiveTab(tabId);
-    };
-    
-    const handleModalClick = (e) => e.stopPropagation();
-    
-    const renderContent = () => {
-        switch (activeTab) {
-            case 'drafts':
-                return (
-                    <div className="text-center py-8">
-                        <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                            <FileText size={20} className="text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 text-sm mb-1">暂无项目草稿</p>
-                        <p className="text-gray-400 text-xs">保存的草稿将显示在这里</p>
-                    </div>
-                );
-            case 'assets':
-                return (
-                    <div className="text-center py-8">
-                        <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                            <FolderKanban size={20} className="text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 text-sm mb-1">暂无项目资产</p>
-                        <p className="text-gray-400 text-xs">项目资产将显示在这里</p>
-                    </div>
-                );
-            case 'characters':
-                return (
-                    <div className="text-center py-8">
-                        <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                            <Users size={20} className="text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 text-sm mb-1">暂无角色</p>
-                        <p className="text-gray-400 text-xs">创建的角色将显示在这里</p>
-                    </div>
-                );
-            case 'materials':
-                return (
-                    <div className="text-center py-8">
-                        <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                            <ImageIcon size={20} className="text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 text-sm mb-1">暂无素材</p>
-                        <p className="text-gray-400 text-xs">上传的素材将显示在这里</p>
-                    </div>
-                );
-            default:
-                return null;
-        }
-    };
-    
-    return (
-        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200" onClick={onClose}>
-            <div className="absolute bg-white rounded-2xl shadow-2xl w-[400px] max-w-full h-[450px] max-h-[80vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-50 duration-200" style={{ left: '100px', top: '300px' }} onMouseDown={handleModalClick} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center border-b border-gray-100 px-4 py-3">
-                    <h2 className="text-base font-bold flex items-center gap-2 text-blue-700">
-                        <FolderKanban size={18} /> 资产管理
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                        <X size={18} />
-                    </button>
-                </div>
-                
-                {/* Tab导航 */}
-                <div className="border-b border-gray-100 px-4">
-                    <div className="flex space-x-0 overflow-x-auto">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => handleTabClick(tab.id)}
-                                className={`px-3 py-2 text-xs font-medium transition-all duration-200 flex items-center gap-1.5 shrink-0 border-b-2 ${
-                                    activeTab === tab.id 
-                                        ? 'border-blue-500 text-blue-700 bg-blue-50' 
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                }`}
-                            >
-                                <tab.icon size={14} />
-                                <span>{tab.label}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                
-                <div className="p-4 h-full overflow-y-auto">
-                    {renderContent()}
-                </div>
-            </div>
-        </div>
-    );
-});
+
+
 
 const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
     const templates = [
@@ -1668,42 +1544,18 @@ const SynopsisDisplayModal = React.memo(({ onClose, synopsisData }) => {
     );
 });
 
-const CreationMenu = ({ x, y, onSelect, onClose }) => (
-  <div className="absolute z-[100] w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 ring-1 ring-gray-200 overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-left" style={{ left: x, top: y }} onMouseDown={e => e.stopPropagation()}>
-    <div className="px-3 py-2 bg-gray-50/80 border-b border-gray-100 flex justify-between items-center"><span className="text-[10px] font-semibold text-blue-600 flex items-center gap-1"><Sparkles size={10}/> 创建新节点</span><button onClick={onClose} className="text-gray-400 hover:bg-gray-200 rounded p-0.5"><X size={12}/></button></div>
-    <div className="p-1 space-y-0.5">
-      {[{ id: 'text', icon: FileText, l: '文本节点', d: '输入提示词或剧本' }, { id: 'image', icon: ImageIcon, l: '图片生成', d: 'Stable Diffusion' }, { id: 'video', icon: Video, l: '视频生成', d: 'SVD / Runway' }, { id: 'audio', icon: Music, l: '音频生成', d: 'MusicGen' }].map(i => (
-        <button key={i.id} onClick={() => onSelect(i.id)} className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 group transition-colors text-left">
-          <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-500 group-hover:text-white flex items-center justify-center"><i.icon size={16}/></div><div><div className="text-xs font-bold text-gray-700 group-hover:text-blue-700">{i.l}</div><div className="text-[10px] text-gray-400">{i.d}</div></div>
-        </button>
-      ))}
-    </div>
-  </div>
-);
 
-const Sidebar = React.memo(({ onAdd, onShowProjectMenu, onShowTemplateList, onShowAssetModal }) => (
-  <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[100] bg-white rounded-2xl shadow-xl border border-gray-100 flex flex-col p-2 gap-2" onMouseDown={e => e.stopPropagation()}>
-    <div className="flex flex-col gap-1.5 pt-1"> 
-      {[{ id: 'project', icon: FolderKanban, label: '项目', action: onShowProjectMenu }, 
-        { id: 'text', icon: Type, label: '文本', action: () => onAdd('text') }, 
-        { id: 'image', icon: ImageIcon, label: '图片', action: () => onAdd('image') }, 
-        { id: 'video', icon: Video, label: '视频', action: () => onAdd('video') }, 
-        { id: 'audio', icon: Music, label: '音频', action: () => onAdd('audio') },
-        { id: 'assets', icon: FolderKanban, label: '资产', action: onShowAssetModal },
-        { id: 'template', icon: LayoutTemplate, label: '模板', action: onShowTemplateList }].map(item => (
-        <button key={item.id} onClick={item.action} className="p-3 rounded-xl flex flex-col items-center gap-1 w-16 text-gray-500 hover:bg-gray-50 hover:text-blue-600 transition-colors" title={item.label}>
-          <item.icon size={20} strokeWidth={2} /><span className="text-[10px] font-medium">{item.label}</span>
-        </button>
-      ))}
-    </div>
-  </div>
-));
+
+
 
 // --- 6. 主应用 (Canvas) ---
 
 const ApiTest = React.lazy(() => import('./components/ApiTest'));
 
 export default function InfiniteCanvasApp() {
+  // 通知系统
+  const { notifications, removeNotification, success, error, info } = useNotification();
+  
   // State
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -1726,6 +1578,8 @@ export default function InfiniteCanvasApp() {
 
   const [project, setProject] = useState(initialProjectState);
   const [isLoading, setIsLoading] = useState(true);
+  const [lastSavedTime, setLastSavedTime] = useState(null); // 记录最后保存时间
+  const [isProjectLoading, setIsProjectLoading] = useState(false); // 项目加载状态
   // 从localStorage加载API Key
   const [userApiKey, setUserApiKeyState] = useState(() => {
     return localStorage.getItem('topflow_api_key') || "";
@@ -1835,15 +1689,79 @@ export default function InfiniteCanvasApp() {
     console.log('✅ API Key检查通过，允许生成');
     return true;
   }, [userApiKey, validateApiKey]);
-  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [showSaveProjectModal, setShowSaveProjectModal] = useState(false);
   const [showAssetModal, setShowAssetModal] = useState(false);
+  const [savedProjects, setSavedProjects] = useState([]);
 
-  const openDB = useCallback(() => new Promise((resolve, reject) => { const r = indexedDB.open(DB_NAME, 1); r.onupgradeneeded = e => { const db = e.target.result; if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME); }; r.onsuccess = e => resolve(e.target.result); r.onerror = e => reject(e.target.error); }), []);
-  const loadProjectFromDB = useCallback(async () => { try { const db = await openDB(); return new Promise((resolve, reject) => { const t = db.transaction(STORE_NAME, 'readonly'); const r = t.objectStore(STORE_NAME).get(PROJECT_KEY); r.onsuccess = e => resolve(e.target.result); r.onerror = e => reject(e.target.error); }); } catch { return null; } }, [openDB]);
-  const saveProjectToDB = useCallback(async (data) => { try { const db = await openDB(); return new Promise((resolve, reject) => { const t = db.transaction(STORE_NAME, 'readwrite'); const r = t.objectStore(STORE_NAME).put(JSON.parse(JSON.stringify(data)), PROJECT_KEY); r.onsuccess = resolve; r.onerror = e => reject(e.target.error); }); } catch (e) { console.error(e); } }, [openDB]);
-
-  useEffect(() => { const load = async () => { const d = await loadProjectFromDB(); if (d) setProject({ ...initialProjectState, ...d, workflows: { ...initialProjectState.workflows, ...d.workflows } }); setIsLoading(false); }; load(); }, [loadProjectFromDB, initialProjectState]);
-  useEffect(() => { if (isLoading) return; const h = setTimeout(() => saveProjectToDB(project), 500); return () => clearTimeout(h); }, [project, isLoading, saveProjectToDB]);
+  // 组件挂载时恢复自动保存的项目
+  useEffect(() => {
+    const restoreAutoSave = async () => {
+      try {
+        // 初始化 IndexedDB
+        await indexedDBManager.init();
+        
+        // 优先尝试从 IndexedDB 恢复
+        const savedWorkflow = await indexedDBManager.getAutoSavedWorkflow();
+        if (savedWorkflow && savedWorkflow.nodes && savedWorkflow.edges) {
+          // 恢复自动保存的项目
+          setProject(prev => ({
+            ...prev,
+            workflows: {
+              ...prev.workflows,
+              [prev.currentEpisodeId]: {
+                nodes: savedWorkflow.nodes || [],
+                edges: savedWorkflow.edges || []
+              }
+            }
+          }));
+          setLastSavedTime(savedWorkflow.timestamp);
+          console.log('✅ 自动保存的项目已恢复 (IndexedDB)');
+        } else {
+          // 如果 IndexedDB 没有数据，尝试从 localStorage 恢复（兼容性）
+          try {
+            const autoSaveData = localStorage.getItem('topflow_auto_save');
+            if (autoSaveData) {
+              const savedProject = JSON.parse(autoSaveData);
+              if (savedProject.nodes && savedProject.edges) {
+                // 恢复自动保存的项目
+                setProject(prev => ({
+                  ...prev,
+                  workflows: {
+                    ...prev.workflows,
+                    [prev.currentEpisodeId]: {
+                      nodes: savedProject.nodes || [],
+                      edges: savedProject.edges || []
+                    }
+                  }
+                }));
+                setLastSavedTime(savedProject.timestamp);
+                console.log('✅ 自动保存的项目已恢复 (localStorage)');
+                
+                // 将 localStorage 的数据迁移到 IndexedDB
+                try {
+                  await indexedDBManager.autoSaveWorkflow({
+                    nodes: savedProject.nodes || [],
+                    edges: savedProject.edges || []
+                  });
+                  console.log('✅ 数据已从 localStorage 迁移到 IndexedDB');
+                } catch (migrationError) {
+                  console.warn('数据迁移失败:', migrationError);
+                }
+              }
+            }
+          } catch (localStorageError) {
+            console.error('从 localStorage 恢复失败:', localStorageError);
+          }
+        }
+      } catch (error) {
+        console.error('恢复自动保存项目失败:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    restoreAutoSave();
+  }, []);
 
   // API - 使用新的三方API客户端
   const generateText = useCallback(async (prompt) => { 
@@ -1949,7 +1867,44 @@ export default function InfiniteCanvasApp() {
   const handleUpdateWorkflow = useCallback((nodeUpdater, edgeUpdater) => {
       setProject(prev => {
           const wf = prev.workflows[prev.currentEpisodeId] || { nodes: [], edges: [] };
-          return { ...prev, workflows: { ...prev.workflows, [prev.currentEpisodeId]: { nodes: nodeUpdater ? nodeUpdater(wf.nodes) : wf.nodes, edges: edgeUpdater ? edgeUpdater(wf.edges) : wf.edges } } };
+          const newState = { ...prev, workflows: { ...prev.workflows, [prev.currentEpisodeId]: { nodes: nodeUpdater ? nodeUpdater(wf.nodes) : wf.nodes, edges: edgeUpdater ? edgeUpdater(wf.edges) : wf.edges } } };
+          
+          // 自动保存当前工作流到 IndexedDB
+          setTimeout(async () => {
+            const currentWorkflow = newState.workflows[newState.currentEpisodeId];
+            if (currentWorkflow) {
+              try {
+                const saveData = {
+                  nodes: currentWorkflow.nodes || [],
+                  edges: currentWorkflow.edges || []
+                };
+                
+                const timestamp = await indexedDBManager.autoSaveWorkflow(saveData);
+                setLastSavedTime(timestamp);
+                console.log('✅ 自动保存完成 (IndexedDB)');
+              } catch (error) {
+                console.error('自动保存失败:', error);
+                // 如果 IndexedDB 失败，回退到 localStorage
+                try {
+                  const autoSaveData = {
+                    id: 'auto-save',
+                    title: '自动保存',
+                    description: '自动保存的项目',
+                    timestamp: Date.now(),
+                    nodes: currentWorkflow.nodes || [],
+                    edges: currentWorkflow.edges || []
+                  };
+                  localStorage.setItem('topflow_auto_save', JSON.stringify(autoSaveData));
+                  setLastSavedTime(Date.now());
+                  console.log('✅ 自动保存完成 (localStorage 回退)');
+                } catch (fallbackError) {
+                  console.error('回退保存也失败:', fallbackError);
+                }
+              }
+            }
+          }, 0);
+          
+          return newState;
       });
   }, []);
   const handleUpdateWorkflowFixed = handleUpdateWorkflow;
@@ -2035,14 +1990,138 @@ export default function InfiniteCanvasApp() {
     }
   }, [addNode]);
 
-  // 保存模板的处理函数
-  const handleSaveTemplate = useCallback((templateData) => {
-    console.log('Saving template:', templateData);
-    // 这里可以添加将模板保存到本地存储或数据库的逻辑
-    // 例如：将自定义模板添加到模板列表中
-    alert(`模板"${templateData.title}"保存成功！`);
-    // 在实际应用中，这里应该将模板数据保存到数据库或本地存储
+  // IndexDB存储功能
+  const openIndexDB = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open('TopFlowDB', 1);
+      
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+      
+      request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains('projects')) {
+          const store = db.createObjectStore('projects', { keyPath: 'id' });
+          store.createIndex('timestamp', 'timestamp', { unique: false });
+        }
+      };
+    });
   }, []);
+
+  // 保存项目到IndexDB
+  const saveProjectToDB = useCallback(async (projectData) => {
+    try {
+      const db = await openIndexDB();
+      const transaction = db.transaction(['projects'], 'readwrite');
+      const store = transaction.objectStore('projects');
+      await store.put(projectData);
+      return true;
+    } catch (error) {
+      console.error('保存项目失败:', error);
+      return false;
+    }
+  }, [openIndexDB]);
+
+  // 从IndexDB加载项目列表
+  const loadProjectsFromDB = useCallback(async () => {
+    try {
+      const db = await openIndexDB();
+      const transaction = db.transaction(['projects'], 'readonly');
+      const store = transaction.objectStore('projects');
+      const request = store.getAll();
+      
+      return new Promise((resolve) => {
+        request.onsuccess = () => {
+          const projects = request.result.sort((a, b) => b.timestamp - a.timestamp);
+          resolve(projects);
+        };
+        request.onerror = () => resolve([]);
+      });
+    } catch (error) {
+      console.error('加载项目失败:', error);
+      return [];
+    }
+  }, [openIndexDB]);
+
+  // 从IndexDB删除项目
+  const deleteProjectFromDB = useCallback(async (projectId) => {
+    try {
+      const db = await openIndexDB();
+      const transaction = db.transaction(['projects'], 'readwrite');
+      const store = transaction.objectStore('projects');
+      await store.delete(projectId);
+      return true;
+    } catch (error) {
+      console.error('删除项目失败:', error);
+      return false;
+    }
+  }, [openIndexDB]);
+
+  // 保存项目的处理函数
+  const handleSaveProject = useCallback(async (projectData) => {
+    try {
+      const success = await saveProjectToDB(projectData);
+      if (success) {
+        // 更新本地状态
+        setSavedProjects(prev => [projectData, ...prev]);
+        success(`项目"${projectData.title}"已成功保存到本地存储`);
+      } else {
+        error('保存项目失败，请检查存储空间后重试');
+      }
+    } catch (error) {
+      console.error('保存项目出错:', error);
+      error('保存项目时发生错误，请检查网络连接或存储权限');
+    }
+  }, [saveProjectToDB, success, error]);
+
+  // 加载项目的处理函数
+  const handleLoadProject = useCallback(async (projectData) => {
+    setIsProjectLoading(true);
+    setShowAssetModal(false);
+    
+    // 模拟加载延迟，显示加载动画
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // 设置项目数据到当前工作流
+    setProject(prev => ({
+      ...prev,
+      workflows: {
+        ...prev.workflows,
+        [prev.currentEpisodeId]: {
+          nodes: projectData.nodes || [],
+          edges: projectData.edges || []
+        }
+      }
+    }));
+    
+    setIsProjectLoading(false);
+  }, []);
+
+  // 删除项目的处理函数
+  const handleDeleteProject = useCallback(async (projectId) => {
+    try {
+      const success = await deleteProjectFromDB(projectId);
+      if (success) {
+        // 更新本地状态
+        setSavedProjects(prev => prev.filter(project => project.id !== projectId));
+        success('项目已成功删除');
+      } else {
+        error('删除项目失败，请检查存储权限后重试');
+      }
+    } catch (error) {
+      console.error('删除项目出错:', error);
+      error('删除项目时发生错误，请检查存储权限');
+    }
+  }, [deleteProjectFromDB, success, error]);
+
+  // 组件挂载时加载项目列表
+  useEffect(() => {
+    const loadProjects = async () => {
+      const projects = await loadProjectsFromDB();
+      setSavedProjects(projects);
+    };
+    loadProjects();
+  }, [loadProjectsFromDB]);
   
   // --- Spawn Nodes ---
   // Defined BEFORE addNode to ensure scope availability
@@ -2155,7 +2234,7 @@ export default function InfiniteCanvasApp() {
     
     handleUpdateWorkflowFixed(prevNodes => {
         const newNodes = [...prevNodes];
-        const GRID_W = 480, START_X = 100, START_Y = 100, MAX_PER_ROW = 8, VERTICAL_SPACING = 80, HORIZONTAL_SPACING = 30;
+        const GRID_W = 480, START_X = 100, START_Y = 100, VERTICAL_SPACING = 80, HORIZONTAL_SPACING = 30;
         
         // 从左到右排列，每行最多4个，添加水平间隔
         let currentX = START_X;
@@ -2173,8 +2252,8 @@ export default function InfiniteCanvasApp() {
                 const nodeHeight = getNodeHeight(node);
                 const nodeWidth = getNodeWidth(node);
                 
-                // 如果当前行已满，换行
-                if (currentRowCount >= MAX_PER_ROW) {
+                // 根据节点宽度自动换行
+                if (currentX + nodeWidth > canvasSize.width - 100) {
                     currentX = START_X;
                     currentY += maxRowHeight + VERTICAL_SPACING;
                     currentRowCount = 0;
@@ -2217,8 +2296,8 @@ export default function InfiniteCanvasApp() {
                 const nodeHeight = getNodeHeight(nodeData);
                 const nodeWidth = getNodeWidth(nodeData);
                 
-                // 如果当前行已满，换行
-                if (currentRowCount >= MAX_PER_ROW) {
+                // 根据节点宽度自动换行
+                if (currentX + nodeWidth > canvasSize.width - 100) {
                     currentX = START_X;
                     currentY += maxRowHeight + VERTICAL_SPACING;
                     currentRowCount = 0;
@@ -2327,6 +2406,14 @@ export default function InfiniteCanvasApp() {
   
   const handleKeyDown = useCallback((e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    
+    // Ctrl+S 保存项目
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      e.preventDefault();
+      setShowSaveProjectModal(true);
+      return;
+    }
+    
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (selectedIds.size > 0) {
         e.preventDefault(); 
@@ -2338,20 +2425,54 @@ export default function InfiniteCanvasApp() {
         setSelectedIds(new Set()); 
       }
     }
-  }, [selectedIds, handleUpdateWorkflowFixed]);
+  }, [selectedIds, handleUpdateWorkflowFixed, setShowSaveProjectModal]);
   useEffect(() => { window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [handleKeyDown]);
 
   if (isLoading) return <div className="flex items-center justify-center h-screen w-full bg-[#f3f4f6] text-gray-500">Loading...</div>;
 
   return (
     <div className="flex flex-col h-screen w-full bg-[#f3f4f6] overflow-hidden font-sans text-slate-800 selection:bg-blue-100">
+      {/* 通知系统容器 */}
+      <NotificationContainer notifications={notifications} removeNotification={removeNotification} />
+      
       <Sidebar onAdd={addNode} onShowProjectMenu={() => setShowProjectMenu(true)} onShowTemplateList={() => setShowTemplateList(true)} onShowAssetModal={() => setShowAssetModal(true)} />
       {showProjectMenu && <ProjectMenu onClose={() => setShowProjectMenu(false)} episodes={project.episodes} currentEpisodeId={currentEpisodeId} onUpdateName={handleUpdateEpisodeName} onAddEpisode={handleAddEpisode} onDeleteEpisode={handleDeleteEpisode} onSelectEpisode={handleSwitchEpisode} />}
       {showApiKeyModal && <ApiKeyConfigModal onClose={() => setShowApiKeyModal(false)} currentKey={userApiKey} onSave={setUserApiKey} onClear={() => setUserApiKey("")} />}
       {synopsisData && <SynopsisDisplayModal onClose={() => setSynopsisData(null)} synopsisData={synopsisData} />}
       {showTemplateList && <TemplateListModal onClose={() => setShowTemplateList(false)} onSelectTemplate={handleSelectTemplate} />}
-      {showSaveTemplateModal && <SaveTemplateModal onClose={() => setShowSaveTemplateModal(false)} onSave={handleSaveTemplate} projectData={{ nodes, edges }} />}
-      {showAssetModal && <AssetModal onClose={() => setShowAssetModal(false)} />}
+      {showSaveProjectModal && <SaveProjectModal onClose={() => setShowSaveProjectModal(false)} onSave={handleSaveProject} projectData={{ nodes, edges }} />}
+      {showAssetModal && <AssetModal onClose={() => setShowAssetModal(false)} projects={savedProjects} onLoadProject={handleLoadProject} onDeleteProject={handleDeleteProject} />}
+      
+      {/* 项目加载动画 */}
+      {isProjectLoading && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-gradient-to-br from-blue-50/30 via-white/50 to-purple-50/30 backdrop-blur-lg animate-in fade-in duration-500">
+          <div className="bg-gradient-to-br from-white/95 to-gray-50/95 backdrop-blur-xl rounded-3xl shadow-2xl p-10 w-96 max-w-full border border-white/50 animate-in zoom-in-50 duration-500">
+            <div className="flex flex-col items-center gap-6">
+              {/* 加载图标 */}
+              <div className="relative">
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <FolderKanban size={24} className="text-white" />
+                </div>
+                <div className="absolute -inset-2 border-2 border-blue-300/50 rounded-3xl animate-pulse"></div>
+              </div>
+              
+              {/* 加载动画 */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="text-center">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">加载项目中</h3>
+                  <p className="text-sm text-gray-500">正在加载项目数据，请稍候...</p>
+                </div>
+              </div>
+              
+              {/* 进度指示器 */}
+              <div className="w-full bg-gray-200/50 rounded-full h-1.5 overflow-hidden">
+                <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full animate-pulse w-3/4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 网络错误通知 */}
       {networkError && (
@@ -2398,13 +2519,27 @@ export default function InfiniteCanvasApp() {
                {menu && <BezierCurve start={getHandlePosition(menu.sourceId, 'source', nodes)} end={{ x: menu.x, y: menu.y }} stroke="#94a3b8" strokeDasharray="4,4" strokeWidth={2} />}
             </svg>
             {(nodes || []).map(n => {
-                const linked = { textInput: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).find(src => src?.type === 'text'), imageInputs: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(src => src?.type === 'image') };
+                const linked = { 
+                    textInput: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).find(src => src?.type === 'text'), 
+                    imageInputs: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(src => src?.type === 'image'),
+                    videoInputs: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(src => src?.type === 'video')
+                };
                 return <NodeCard key={n.id} node={n} updateNode={updateNode} isSelected={selectedIds.has(n.id)} onSelect={onNodeSelect} onConnectStart={onConnectStart} onConnectEnd={onConnectEnd} onSpawnNodes={handleSpawnNodes} onDelete={deleteNode} linkedSources={linked} apiFunctions={apiFunctions} onShowAssetModal={() => setShowAssetModal(true)} />;
             })}
             {menu && <CreationMenu x={menu.x} y={menu.y} onSelect={(t) => { addNode(t, menu.x + 50, menu.y, menu.sourceId); setMenu(null); }} onClose={() => setMenu(null)} />}
          </div>
          {dragState?.type === 'select' && <div style={{ position: 'fixed', left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', zIndex: 9999, pointerEvents: 'none' }} />}
-         <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto"><Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button></div>
+         <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto flex flex-col gap-2">
+          <Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button>
+          
+          {/* 自动保存状态指示器 */}
+          {lastSavedTime && (
+            <div className="flex items-center gap-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-200 shadow-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>自动保存于 {new Date(lastSavedTime).toLocaleTimeString('zh-CN')}</span>
+            </div>
+          )}
+        </div>
          <div className="absolute bottom-6 right-4 z-[100] pointer-events-auto flex gap-2">
            <Button 
              variant="secondary" 
@@ -2418,16 +2553,16 @@ export default function InfiniteCanvasApp() {
            <Button variant="secondary" icon={LayoutTemplate} onClick={handleAutoLayout} className="bg-white shadow-lg border-gray-300">自动整理</Button>
          </div>
          
-         {/* 右上角保存模板按钮 */}
+         {/* 右上角保存项目按钮 */}
          <div className="absolute top-6 right-4 z-[100] pointer-events-auto">
            <Button 
              variant="secondary" 
              icon={Save} 
-             onClick={() => setShowSaveTemplateModal(true)} 
+             onClick={() => setShowSaveProjectModal(true)} 
              className="bg-white shadow-lg border-gray-300 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-             title="保存当前项目为模板"
+             title="保存当前项目"
            >
-             保存模板
+             保存项目
            </Button>
          </div>
          

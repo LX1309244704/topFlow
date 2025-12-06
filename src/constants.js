@@ -61,7 +61,7 @@ export const LAYOUT_CONSTANTS = {
   GRID_WIDTH: 350,
   START_X: 100,
   START_Y: 100,
-  MAX_PER_ROW: 4,
+  MAX_PER_ROW: Infinity, // 取消每行节点数量限制
   LEVEL_MARGIN: 150,
   VERTICAL_SPACING: 50
 };

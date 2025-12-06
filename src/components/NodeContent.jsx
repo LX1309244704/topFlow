@@ -4,7 +4,7 @@ import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
 
 // 图片节点内容组件
-export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText }) => {
+export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
   const modelOptions = [
     { value: "imagen-4", label: "Imagen 4.0 (AI)" },
     { value: "nano-banana", label: "Nano Banana" },

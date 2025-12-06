@@ -82,6 +82,24 @@ export const generateImageFromRef = async (prompt, refImage, model, ratio) => {
 };
 
 /**
+ * 统一多参考图像生成接口
+ * @param {string} prompt - 图像生成提示词
+ * @param {Array} refImages - 参考图像数组（Base64数据）
+ * @param {string} model - 模型名称
+ * @param {string} ratio - 图像宽高比
+ * @returns {Promise<string>} Base64编码的图像数据
+ */
+export const generateImageFromMultipleRefs = async (prompt, refImages, model, ratio) => {
+  // 目前API只支持单参考图，这里使用第一张参考图
+  // 未来可以扩展为支持多参考图的API
+  if (refImages.length > 0) {
+    return await generateGeminiImageFromRef(prompt, refImages[0], model, ratio);
+  } else {
+    return await generateGeminiImage(prompt, model, ratio);
+  }
+};
+
+/**
  * 统一语音合成接口
  * @param {string} text - 要转换的文本
  * @returns {Promise<string>} Base64编码的音频数据
@@ -138,6 +156,7 @@ export default {
   generateStreamText,
   generateImage,
   generateImageFromRef,
+  generateImageFromMultipleRefs,
   generateTts,
   generateStructuredSynopsis,
   generateTtsSong,

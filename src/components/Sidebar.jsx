@@ -17,8 +17,8 @@ export const Sidebar = React.memo(({
         { id: 'image', icon: ImageIcon, label: '图片', action: () => onAdd('image') }, 
         { id: 'video', icon: Video, label: '视频', action: () => onAdd('video') }, 
         { id: 'audio', icon: Music, label: '音频', action: () => onAdd('audio') },
-        { id: 'assets', icon: FolderKanban, label: '资产', action: onShowAssetModal },
-        { id: 'template', icon: LayoutTemplate, label: '模板', action: onShowTemplateList }
+        { id: 'assets', icon: FolderKanban, label: '资产', action: onShowAssetModal }
+        // { id: 'template', icon: LayoutTemplate, label: '模板', action: onShowTemplateList }
       ].map(item => (
         <button 
           key={item.id} 
