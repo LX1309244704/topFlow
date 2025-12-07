@@ -2,11 +2,11 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { 
   Plus, Image as ImageIcon, Zap, ChevronDown, ChevronRight, Minus, Layers, Wand2, X, Mountain, FolderKanban, 
   Type, Video, Music, Play, FileText, Mic, Copy, Square, Sparkles, Link as LinkIcon, LayoutTemplate,
-  RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock, Map
+  RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock, Map, Film
 } from 'lucide-react';
 import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
-import { AudioContent } from './components/NodeContent.jsx';
+import { AudioContent, TextContent, ImageContent } from './components/NodeContent.jsx';
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 import { AssetModal, SaveProjectModal, ProjectMenu } from './components/Modals.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
@@ -195,345 +195,11 @@ const InputBadge = ({ text, type }) => {
 };
 
 // --- Node Content Components (Defined before NodeCard) ---
-
-const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText }) => {
-  const modelOptions = [
-    { value: "nano-banana", label: "Nano Banana" },
-    { value: "nano-banana-pro", label: "Nano Banana Pro" },
-  ];
-  const fileRef = useRef(null);
-
-  useEffect(() => {
-    const generatedImage = node.data.generatedImage;
-    const currentAspect = node.data.aspectRatio;
-    if (generatedImage && typeof generatedImage === 'string' && generatedImage.startsWith('data:')) {
-        const img = new Image();
-        img.onload = () => {
-            const aspect = img.width / img.height;
-            if (Math.abs(aspect - currentAspect) > 0.01) {
-                updateNode(node.id, { data: { ...node.data, aspectRatio: aspect } });
-            }
-        };
-        img.src = generatedImage;
-    }
-  }, [node.data.generatedImage, node.id, updateNode, node.data.aspectRatio]);
-
-  const handleImageUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const img = new Image();
-        img.onload = () => {
-            const aspect = img.width / img.height;
-            updateNode(node.id, { data: { ...node.data, generatedImage: reader.result, aspectRatio: aspect } });
-        };
-        img.src = reader.result;
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleEnhance = async () => {
-    if (!node.data.prompt) return;
-    updateNode(node.id, { data: { ...node.data, isGenerating: true } });
-    const enhanced = await generateText(`Rewrite this image prompt to be more descriptive...: ${node.data.prompt}`);
-    updateNode(node.id, { data: { ...node.data, prompt: enhanced, isGenerating: false } });
-  };
-  
-  const handleDownload = () => {
-      downloadFile(node.data.generatedImage, `image-${node.id}.png`);
-  };
-
-  const handleClearImage = () => {
-      updateNode(node.id, { data: { ...node.data, generatedImage: null } });
-  };
-  
-  const currentAspect = node.data.aspectRatio || 4/3;
-  
+// 使用 src/components/NodeContent.jsx 中的组件定义
 
 
-  return (
-    <>
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: currentAspect }}>
-        {node.data.isGenerating ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"/><span className="text-xs text-blue-600 font-bold animate-pulse">Generating...</span></div>
-        ) : node.data.generatedImage ? (
-          <>
-            <img src={node.data.generatedImage} alt="Gen" className="w-full h-full object-cover select-none" draggable={false} onDragStart={(e) => e.preventDefault()} />
-            <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 bg-white/80 hover:bg-white text-gray-700 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="下载图片"><Download size={14} /></button>
-                <button onClick={(e) => { e.stopPropagation(); handleClearImage(); }} className="p-1.5 bg-white/80 hover:bg-white text-red-500 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="清除图片"><Trash2 size={14} /></button>
-            </div>
-          </>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center"><Mountain size={64} className="text-blue-200/80" /></div>
-        )}
-      </div>
-      <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
-        {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
-        <div className="relative">
-            <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-md p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="描述画面..." rows={2} value={node.data.prompt || ''} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
-            <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors"><Wand2 size={14} /></button>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-             <NodeSelect value={node.data.model || "imagen-4"} options={modelOptions} onChange={v => updateNode(node.id, { data: {...node.data, model: v} })} className="flex-1"/>
-        </div>
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-           <div className="flex gap-1.5">
-             <NodeSelect value={node.data.ratio || "4:3"} options={[{value:"1:1",label:"1:1"}, {value:"4:3",label:"4:3"}, {value:"16:9",label:"16:9"}, {value:"3:4",label:"3:4"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { 
-                const [w, h] = v.split(':').map(Number); 
-                const newAspectRatio = w/h;
-                updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: newAspectRatio} }); 
-              }} className="w-20"/>
-             <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}, {value:4,label:"4x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
-             <button onClick={() => fileRef.current?.click()} className="p-1.5 hover:bg-gray-100 rounded text-gray-400"><ImageIcon size={14}/></button>
-             <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload}/>
-           </div>
-           <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95"><Zap size={10} className="fill-white"/>生成</button>
-        </div>
-      </div>
-    </>
-  );
-};
 
-const TextContent = ({ node, updateNode, generateText, generateStreamText, handleAnalyze, isAnalyzing }) => {
-  const minHeight = 160;
-  const currentHeight = node.data.height || minHeight;
-  const [localResizing, setLocalResizing] = useState(false);
-  const isWriting = !!node.data.isWriting;
-  const textContentRef = useRef(null);
-  const [displayText, setDisplayText] = useState(''); // 用于打字机效果的显示文本
-  const typingIntervalRef = useRef(null); // 用于存储定时器引用
-  const [currentCharIndex, setCurrentCharIndex] = useState(0); // 当前显示的字符索引
-  
-  // 打字机效果 - 监听节点streamingText变化
-  useEffect(() => {
-    const streamingText = node.data.streamingText || '';
-    
-    if (isWriting && streamingText && streamingText.length > 0) {
-      // 重置打字机状态
-      setCurrentCharIndex(0);
-      setDisplayText('');
-      
-      // 清除之前的定时器
-      if (typingIntervalRef.current) {
-        clearInterval(typingIntervalRef.current);
-        typingIntervalRef.current = null;
-      }
-      
-      // 开始新的打字效果
-      typingIntervalRef.current = setInterval(() => {
-        setCurrentCharIndex(prev => {
-          if (prev < streamingText.length) {
-            const newText = streamingText.substring(0, prev + 1);
-            setDisplayText(newText);
-            return prev + 1;
-          } else {
-            // 打字完成，清除定时器
-            if (typingIntervalRef.current) {
-              clearInterval(typingIntervalRef.current);
-              typingIntervalRef.current = null;
-            }
-            return prev;
-          }
-        });
-      }, 30); // 调整打字速度，数值越小打字越快
-      
-      return () => {
-        if (typingIntervalRef.current) {
-          clearInterval(typingIntervalRef.current);
-          typingIntervalRef.current = null;
-        }
-      };
-    } else if (!isWriting) {
-      // 停止写作时重置状态
-      setDisplayText('');
-      setCurrentCharIndex(0);
-      if (typingIntervalRef.current) {
-        clearInterval(typingIntervalRef.current);
-        typingIntervalRef.current = null;
-      }
-    }
-  }, [isWriting, node.data.streamingText]);
 
-  const handleAIWrite = async () => {
-      if (!node.data.text || isWriting || isAnalyzing) return;
-      
-      // 保存当前文本内容
-      const originalText = node.data.text || '';
-      const selectedModel = node.data.model || "gemini-2.5-pro";
-      const selectedRole = node.data.role || "storyboard-expert";
-      const rolePrompt = getRolePrompt(selectedRole);
-      
-      // 调试：打印选中的模型和角色
-      console.log('文本续写 - 选择的模型:', selectedModel, '选择的角色:', selectedRole, '节点数据:', node.data);
-      
-      // 重置状态
-      updateNode(node.id, { data: { ...node.data, isWriting: true, streamingText: '' } });
-      setDisplayText('');
-      setCurrentCharIndex(0);
-      
-      // 清除之前的定时器
-      if (typingIntervalRef.current) {
-        clearInterval(typingIntervalRef.current);
-        typingIntervalRef.current = null;
-      }
-      
-      const prompt = `${rolePrompt}\n\n请续写以下故事或剧本（使用中文）：${originalText}`;
-      
-      // 使用流式API获取内容
-      let accumulatedText = '';
-      const finalResult = await generateStreamText(prompt, (chunk) => {
-        // 检查chunk是否存在且不为undefined
-        if (chunk && chunk.trim() && chunk !== undefined && chunk !== null) {
-          accumulatedText += chunk;
-          // 直接更新节点的streamingText，打字机效果会自动监听这个变化
-          updateNode(node.id, { 
-            data: { 
-              ...node.data, 
-              streamingText: accumulatedText
-            } 
-          });
-        }
-      }, selectedModel);
-      
-      // 完成后将流式内容添加到原文本
-      updateNode(node.id, { 
-        data: { 
-          ...node.data, 
-          text: originalText + "\n\n" + (accumulatedText || finalResult || ''), 
-          streamingText: '',
-          isWriting: false 
-        } 
-      });
-      
-      // 重置状态
-      setDisplayText('');
-      setCurrentCharIndex(0);
-      
-      if (typingIntervalRef.current) {
-        clearInterval(typingIntervalRef.current);
-        typingIntervalRef.current = null;
-      }
-  };
-  
-const handleAnalysisClick = async () => {
-      if (!node.data.text || isWriting || isAnalyzing) return;
-      const selectedModel = node.data.model || "gemini-2.5-pro";
-      const selectedRole = node.data.role || "storyboard-expert";
-      const rolePrompt = getRolePrompt(selectedRole);
-      
-      // 调试：打印选中的模型和角色
-      console.log('文本分析 - 选择的模型:', selectedModel, '选择的角色:', selectedRole, '节点数据:', node.data);
-      
-      handleAnalyze(node.data.text, selectedModel, rolePrompt);
-    };
-  
-  const handleLocalResize = useCallback((e) => {
-    if (!localResizing || !textContentRef.current) return;
-    const dy = e.clientY - textContentRef.current.initialY;
-    let newHeight = textContentRef.current.initialHeight + dy;
-    newHeight = Math.max(minHeight, newHeight);
-    updateNode(node.id, { data: { ...node.data, height: newHeight } });
-  }, [localResizing, updateNode, node.id, node.data]);
-
-  const handleLocalResizeEnd = useCallback(() => {
-    setLocalResizing(false);
-    document.body.style.cursor = 'default';
-  }, []);
-
-  useEffect(() => {
-    if (localResizing) {
-        window.addEventListener('mousemove', handleLocalResize);
-        window.addEventListener('mouseup', handleLocalResizeEnd);
-        document.body.style.cursor = 'ns-resize';
-    } else {
-        window.removeEventListener('mousemove', handleLocalResize);
-        window.removeEventListener('mouseup', handleLocalResizeEnd);
-        document.body.style.cursor = 'default';
-    }
-    return () => {
-        window.removeEventListener('mousemove', handleLocalResize);
-        window.removeEventListener('mouseup', handleLocalResizeEnd);
-    };
-  }, [localResizing, handleLocalResize, handleLocalResizeEnd]);
-
-  const isAiWorking = isAnalyzing || isWriting;
-
-    // 文本模型选项
-  const textModelOptions = [
-    {value: "gemini-2.5-pro", label: "Gemini 2.5 Pro"},
-    {value: "gemini-3-pro", label: "Gemini 3 Pro"}
-  ];
-
-  
-
-  return (
-    <div ref={textContentRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col cursor-text relative" onClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ height: `${currentHeight}px`, minHeight: `${minHeight}px` }}>
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-        <div className="text-xs text-gray-500 font-medium">模型:</div>
-        <NodeSelect 
-          value={node.data.model || "gemini-2.5-pro"} 
-          options={textModelOptions} 
-          onChange={v => updateNode(node.id, { data: { ...node.data, model: v } })} 
-          className="flex-1" 
-        />
-      </div>
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-        <div className="text-xs text-gray-500 font-medium">角色:</div>
-        <NodeSelect 
-          value={node.data.role || "storyboard-expert"} 
-          options={textRoleOptions} 
-          onChange={v => updateNode(node.id, { data: { ...node.data, role: v } })} 
-          className="flex-1" 
-        />
-      </div>
-       <div className="flex-1 p-4 relative group">
-         <textarea 
-            className="w-full h-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0 leading-relaxed placeholder-gray-300" 
-            placeholder="输入剧本..." 
-            value={(() => {
-                const baseText = node.data.text || '';
-                
-                if (isWriting) {
-                    // 如果正在写作，显示原始文本 + 打字机效果的实时显示
-                    return baseText + (displayText ? "\n\n" + displayText : '');
-                } else {
-                    // 正常编辑时只显示基础文本
-                    return baseText;
-                }
-            })()} 
-            onChange={e => updateNode(node.id, { data: { ...node.data, text: e.target.value } })} 
-            onMouseDown={e => e.stopPropagation()} 
-            onWheel={e => e.stopPropagation()}
-            readOnly={isWriting}
-         />
-         {isWriting && (
-            <div className="absolute bottom-2 left-4 text-xs text-blue-500 animate-pulse">
-              正在生成内容...
-            </div>
-         )}
-         <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={handleAnalysisClick} className="bg-purple-50 text-purple-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-purple-100 disabled:opacity-50" disabled={isAiWorking}>
-                {isAnalyzing ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 分析中...</span> : <span className="flex items-center gap-1"><Search size={10}/> 生成大纲</span>}
-            </button>
-            <button onClick={handleAIWrite} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-blue-100 disabled:opacity-50" disabled={isAiWorking}>
-                {isWriting ? <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 生成中...</span> : <span className="flex items-center gap-1"><Sparkles size={10}/> AI 生成</span>}
-            </button>
-         </div>
-       </div>
-       <div className="bg-gray-50 px-3 py-2 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400 rounded-b-2xl">
-           <span>{(node.data.text?.length || 0) + (node.data.streamingText?.length || 0)} 字符</span>
-           <Copy size={12} className="cursor-pointer hover:text-gray-600"/>
-           <div className="absolute right-0 bottom-0 w-4 h-4 cursor-ns-resize z-10 text-gray-400 hover:text-blue-500 flex items-center justify-center transition-colors"
-               onMouseDown={(e) => { e.stopPropagation(); textContentRef.current.initialY = e.clientY; textContentRef.current.initialHeight = currentHeight; setLocalResizing(true); }}>
-               <span className="w-1.5 h-1.5 bg-current rounded-full absolute -bottom-0.5 -right-0.5" />
-           </div>
-       </div>
-    </div>
-  );
-};
 
 const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, videoInputs, generateText }) => {
   const videoModelOptions = [
@@ -1854,6 +1520,17 @@ export default function InfiniteCanvasApp() {
             setTimeout(() => setNetworkError(false), 3000);
           }
           
+          // 如果是内容政策违规错误，显示用户友好的提示
+          if (error.message && error.message.includes('内容政策')) {
+            addNotification({
+              id: Date.now(),
+              type: 'error',
+              title: '内容政策违规',
+              message: '您输入的提示词可能违反了内容政策，请尝试修改提示词或避免使用敏感内容。',
+              duration: 5000
+            });
+          }
+          
           return null; 
       } 
   }, [setShowApiKeyModal, setNetworkError]);
@@ -1868,41 +1545,6 @@ export default function InfiniteCanvasApp() {
       setProject(prev => {
           const wf = prev.workflows[prev.currentEpisodeId] || { nodes: [], edges: [] };
           const newState = { ...prev, workflows: { ...prev.workflows, [prev.currentEpisodeId]: { nodes: nodeUpdater ? nodeUpdater(wf.nodes) : wf.nodes, edges: edgeUpdater ? edgeUpdater(wf.edges) : wf.edges } } };
-          
-          // 自动保存当前工作流到 IndexedDB
-          setTimeout(async () => {
-            const currentWorkflow = newState.workflows[newState.currentEpisodeId];
-            if (currentWorkflow) {
-              try {
-                const saveData = {
-                  nodes: currentWorkflow.nodes || [],
-                  edges: currentWorkflow.edges || []
-                };
-                
-                const timestamp = await indexedDBManager.autoSaveWorkflow(saveData);
-                setLastSavedTime(timestamp);
-                console.log('✅ 自动保存完成 (IndexedDB)');
-              } catch (error) {
-                console.error('自动保存失败:', error);
-                // 如果 IndexedDB 失败，回退到 localStorage
-                try {
-                  const autoSaveData = {
-                    id: 'auto-save',
-                    title: '自动保存',
-                    description: '自动保存的项目',
-                    timestamp: Date.now(),
-                    nodes: currentWorkflow.nodes || [],
-                    edges: currentWorkflow.edges || []
-                  };
-                  localStorage.setItem('topflow_auto_save', JSON.stringify(autoSaveData));
-                  setLastSavedTime(Date.now());
-                  console.log('✅ 自动保存完成 (localStorage 回退)');
-                } catch (fallbackError) {
-                  console.error('回退保存也失败:', fallbackError);
-                }
-              }
-            }
-          }, 0);
           
           return newState;
       });
@@ -1993,17 +1635,42 @@ export default function InfiniteCanvasApp() {
   // IndexDB存储功能
   const openIndexDB = useCallback(() => {
     return new Promise((resolve, reject) => {
-      const request = indexedDB.open('TopFlowDB', 1);
+      // 首先动态获取当前数据库版本
+      const versionRequest = indexedDB.open('TopFlowDB');
+      versionRequest.onsuccess = () => {
+        const db = versionRequest.result;
+        const currentVersion = db.version || 1;
+        db.close();
+        
+        // 使用正确的版本号打开数据库
+        const request = indexedDB.open('TopFlowDB', currentVersion);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('projects')) {
+            const store = db.createObjectStore('projects', { keyPath: 'id' });
+            store.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+        };
+      };
       
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
-      
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains('projects')) {
-          const store = db.createObjectStore('projects', { keyPath: 'id' });
-          store.createIndex('timestamp', 'timestamp', { unique: false });
-        }
+      versionRequest.onerror = () => {
+        // 如果数据库不存在，使用版本1创建
+        const request = indexedDB.open('TopFlowDB', 1);
+        
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        
+        request.onupgradeneeded = (event) => {
+          const db = event.target.result;
+          if (!db.objectStoreNames.contains('projects')) {
+            const store = db.createObjectStore('projects', { keyPath: 'id' });
+            store.createIndex('timestamp', 'timestamp', { unique: false });
+          }
+        };
       };
     });
   }, []);
@@ -2060,8 +1727,8 @@ export default function InfiniteCanvasApp() {
   // 保存项目的处理函数
   const handleSaveProject = useCallback(async (projectData) => {
     try {
-      const success = await saveProjectToDB(projectData);
-      if (success) {
+      const saveResult = await saveProjectToDB(projectData);
+      if (saveResult) {
         // 更新本地状态
         setSavedProjects(prev => [projectData, ...prev]);
         success(`项目"${projectData.title}"已成功保存到本地存储`);
@@ -2100,8 +1767,8 @@ export default function InfiniteCanvasApp() {
   // 删除项目的处理函数
   const handleDeleteProject = useCallback(async (projectId) => {
     try {
-      const success = await deleteProjectFromDB(projectId);
-      if (success) {
+      const deleteResult = await deleteProjectFromDB(projectId);
+      if (deleteResult) {
         // 更新本地状态
         setSavedProjects(prev => prev.filter(project => project.id !== projectId));
         success('项目已成功删除');
@@ -2529,16 +2196,8 @@ export default function InfiniteCanvasApp() {
             {menu && <CreationMenu x={menu.x} y={menu.y} onSelect={(t) => { addNode(t, menu.x + 50, menu.y, menu.sourceId); setMenu(null); }} onClose={() => setMenu(null)} />}
          </div>
          {dragState?.type === 'select' && <div style={{ position: 'fixed', left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', zIndex: 9999, pointerEvents: 'none' }} />}
-         <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto flex flex-col gap-2">
-          <Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button>
-          
-          {/* 自动保存状态指示器 */}
-          {lastSavedTime && (
-            <div className="flex items-center gap-2 text-xs text-gray-500 bg-white/80 backdrop-blur-sm rounded-lg px-3 py-2 border border-gray-200 shadow-sm">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span>自动保存于 {new Date(lastSavedTime).toLocaleTimeString('zh-CN')}</span>
-            </div>
-          )}
+        <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto flex flex-col gap-2">
+         <Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button>
         </div>
          <div className="absolute bottom-6 right-4 z-[100] pointer-events-auto flex gap-2">
            <Button 

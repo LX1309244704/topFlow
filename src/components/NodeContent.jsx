@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
+import apiClient from '../api/client.js';
 
 // 图片节点内容组件
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
@@ -57,7 +58,7 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   const handleClearImage = () => {
     updateNode(node.id, { data: { ...node.data, generatedImage: null } });
   };
-  
+
   const currentAspect = node.data.aspectRatio || 4/3;
 
   return (
@@ -205,6 +206,7 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
     
     const originalText = node.data.text || '';
     const selectedModel = node.data.model || "gemini-2.5";
+    const rolePrompt = node.data.rolePrompt || '';
     
     updateNode(node.id, { data: { ...node.data, isWriting: true, streamingText: '' } });
     setDisplayText('');
@@ -215,7 +217,13 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
       typingIntervalRef.current = null;
     }
     
-    const prompt = `请续写以下故事或剧本（使用中文）：${originalText}`;
+    // 如果有角色提示词，则使用角色提示词格式
+    let prompt;
+    if (rolePrompt && rolePrompt.trim()) {
+      prompt = `${rolePrompt}\n\n请基于以上角色设定，续写以下内容：${originalText}`;
+    } else {
+      prompt = `请续写以下故事或剧本（使用中文）：${originalText}`;
+    }
     
     let accumulatedText = '';
     const finalResult = await generateStreamText(prompt, (chunk) => {
@@ -251,7 +259,17 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
   const handleAnalysisClick = async () => {
     if (!node.data.text || isWriting || isAnalyzing) return;
     const selectedModel = node.data.model || "gemini-2.5";
-    handleAnalyze(node.data.text, selectedModel);
+    const rolePrompt = node.data.rolePrompt || '';
+    
+    // 如果有角色提示词，则使用角色提示词格式
+    let prompt;
+    if (rolePrompt && rolePrompt.trim()) {
+      prompt = `${rolePrompt}\n\n请基于以上角色设定，分析以下文本并生成大纲：${node.data.text}`;
+    } else {
+      prompt = `请分析以下文本并生成大纲（使用中文）：${node.data.text}`;
+    }
+    
+    handleAnalyze(prompt, selectedModel);
   };
   
   const handleLocalResize = useCallback((e) => {
@@ -291,6 +309,62 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
     {value: "gemini-3", label: "Gemini 3"}
   ];
 
+  // 移除预设角色，只保留'无角色设定'选项
+
+  // 获取自定义角色 - 简化逻辑，直接使用函数获取
+  const [customRoles, setCustomRoles] = useState([]);
+
+  // 加载角色数据的函数
+  const loadRoles = () => {
+    try {
+      const saved = localStorage.getItem('topflow_custom_roles');
+      if (saved) {
+        const roles = JSON.parse(saved);
+        // 过滤有效角色
+        const filteredRoles = roles.filter(role => role && role.value && role.label);
+        setCustomRoles(filteredRoles);
+        console.log('Text节点加载角色数据:', filteredRoles.length, '个角色');
+      } else {
+        setCustomRoles([]);
+        console.log('Text节点: 没有找到角色数据');
+      }
+    } catch (error) {
+      console.error('加载自定义角色失败:', error);
+      setCustomRoles([]);
+    }
+  };
+
+  // 组件挂载时加载角色数据
+  useEffect(() => {
+    loadRoles();
+  }, []);
+
+  // 监听localStorage变化实现实时同步
+  useEffect(() => {
+    const handleStorageChange = () => {
+      loadRoles();
+    };
+
+    // 监听storage事件（跨标签页同步）
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 监听自定义的localStorage变化事件（同标签页内同步）
+    window.addEventListener('localStorageChange', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('localStorageChange', handleStorageChange);
+    };
+  }, []);
+
+  // 角色选项 - 仅从资产角色库获取
+  const allRoleOptions = [
+    { value: '', label: '无角色设定' },
+    ...(customRoles || []).filter(role => role && role.value && role.label) // 确保只包含有效的角色
+  ];
+  
+
+
   return (
     <div ref={textContentRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col cursor-text relative" onClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ height: `${currentHeight}px`, minHeight: `${minHeight}px` }}>
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
@@ -302,6 +376,29 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
           className="flex-1" 
         />
       </div>
+      
+      {/* 角色设置区域 */}
+      <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
+        <div className="text-xs text-gray-500 font-medium mb-2">角色设定:</div>
+        <div className="flex items-center gap-2">
+          <NodeSelect 
+            value={node.data.selectedRole || ""} 
+            options={allRoleOptions} 
+            onChange={v => {
+              const selectedRole = allRoleOptions.find(role => role.value === v);
+              updateNode(node.id, { 
+                data: { 
+                  ...node.data, 
+                  selectedRole: v,
+                  rolePrompt: selectedRole ? (selectedRole.prompt || selectedRole.value) : ''
+                } 
+              });
+            }} 
+            className="flex-1" 
+          />
+        </div>
+      </div>
+      
       <div className="flex-1 p-4 relative group">
         <textarea 
           className="w-full h-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0 leading-relaxed placeholder-gray-300" 
@@ -333,8 +430,8 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
           </button>
           <button onClick={handleAIWrite} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-blue-100 disabled:opacity-50" disabled={isAiWorking}>
             {isWriting ? 
-              <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 续写中...</span> : 
-              <span className="flex items-center gap-1"><Sparkles size={10}/> AI 续写</span>
+              <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 生成中...</span> : 
+              <span className="flex items-center gap-1"><Sparkles size={10}/> AI 生成</span>
             }
           </button>
         </div>

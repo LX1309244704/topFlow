@@ -548,6 +548,120 @@ export const AssetModal = React.memo(({ onClose, projects = [], onLoadProject, o
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5); // 每页显示5个项目
   
+  // 角色管理状态
+  const [customRoles, setCustomRoles] = useState(() => {
+    try {
+      const saved = localStorage.getItem('topflow_custom_roles');
+      if (saved) {
+        const roles = JSON.parse(saved);
+        // 保留所有角色，不进行任何过滤
+        return roles.filter(role => role && role.value && role.label);
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+  
+  const [showRoleManager, setShowRoleManager] = useState(false);
+  const [showRoleEditor, setShowRoleEditor] = useState(false);
+  const [newRoleName, setNewRoleName] = useState('');
+  const [newRolePrompt, setNewRolePrompt] = useState('');
+  const [editingRole, setEditingRole] = useState(null);
+  const [editingRoleName, setEditingRoleName] = useState('');
+  const [editingRolePrompt, setEditingRolePrompt] = useState('');
+  
+  // 保存自定义角色到本地存储并触发同步事件
+  const saveCustomRoles = (newRoles) => {
+    try {
+      console.log('资产角色库保存角色到localStorage:', newRoles);
+      localStorage.setItem('topflow_custom_roles', JSON.stringify(newRoles));
+      // 触发storage事件以通知其他组件（跨标签页）
+      window.dispatchEvent(new Event('storage'));
+      // 触发自定义事件以通知同一标签页内的组件
+      window.dispatchEvent(new Event('localStorageChange'));
+      console.log('资产角色库已保存:', newRoles.length, '个角色');
+    } catch (error) {
+      console.error('保存自定义角色失败:', error);
+    }
+  };
+  
+  // 监听localStorage变化实现实时同步
+  useEffect(() => {
+    const handleStorageChange = () => {
+      try {
+        const saved = localStorage.getItem('topflow_custom_roles');
+        if (saved) {
+          const newRoles = JSON.parse(saved);
+          setCustomRoles(newRoles);
+        }
+      } catch (error) {
+        console.error('同步自定义角色失败:', error);
+      }
+    };
+
+    // 监听storage事件（跨标签页同步）
+    window.addEventListener('storage', handleStorageChange);
+    
+    // 定期检查localStorage变化（同标签页内同步）
+    const interval = setInterval(handleStorageChange, 1000);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+  
+  // 添加自定义角色
+  const addCustomRole = (name, prompt) => {
+    if (!name.trim() || !prompt.trim()) return;
+    
+    const newRole = {
+      value: `custom_${Date.now()}`,
+      label: name,
+      prompt: prompt
+    };
+    
+    const updatedRoles = [...customRoles, newRole];
+    setCustomRoles(updatedRoles);
+    saveCustomRoles(updatedRoles);
+    setNewRoleName('');
+    setNewRolePrompt('');
+  };
+  
+  // 删除自定义角色
+  const deleteCustomRole = (roleValue) => {
+    const updatedRoles = customRoles.filter(role => role.value !== roleValue);
+    setCustomRoles(updatedRoles);
+    saveCustomRoles(updatedRoles);
+  };
+  
+  // 开始编辑角色
+  const startEditRole = (role) => {
+    setEditingRole(role);
+    setEditingRoleName(role.label);
+    setEditingRolePrompt(role.prompt);
+    setShowRoleEditor(true);
+  };
+  
+  // 更新角色
+  const updateRole = () => {
+    if (!editingRole || !editingRoleName.trim() || !editingRolePrompt.trim()) return;
+    
+    const updatedRoles = customRoles.map(role => 
+      role.value === editingRole.value 
+        ? { ...role, label: editingRoleName, prompt: editingRolePrompt }
+        : role
+    );
+    
+    setCustomRoles(updatedRoles);
+    saveCustomRoles(updatedRoles);
+    setShowRoleEditor(false);
+    setEditingRole(null);
+    setEditingRoleName('');
+    setEditingRolePrompt('');
+  };
+  
   // 计算分页数据
   const getPaginatedProjects = useCallback(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -676,11 +790,64 @@ export const AssetModal = React.memo(({ onClose, projects = [], onLoadProject, o
 
       case 'characters':
         return (
-          <EmptyState 
-            icon={Users}
-            title="暂无角色"
-            description="创建的角色将显示在这里"
-          />
+          <div className="flex flex-col h-full">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-semibold text-gray-700">自定义角色库</h3>
+              <button 
+                onClick={() => setShowRoleManager(true)}
+                className="text-xs bg-purple-500 text-white px-3 py-1 rounded-lg hover:bg-purple-600 transition-colors"
+              >
+                + 添加角色
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto">
+              {customRoles.length === 0 ? (
+                <EmptyState 
+                  icon={Users}
+                  title="暂无自定义角色"
+                  description="点击添加角色按钮创建您的专属AI角色"
+                />
+              ) : (
+                <div className="space-y-3">
+                  {customRoles.map(role => (
+                    <div key={role.value} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-medium text-gray-800">{role.label}</h4>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => startEditRole(role)}
+                            className="text-blue-400 hover:text-blue-600 text-xs flex items-center gap-1"
+                            title="修改角色"
+                          >
+                            <Pencil size={12} />
+                            修改
+                          </button>
+                          <button 
+                            onClick={() => deleteCustomRole(role.value)}
+                            className="text-red-400 hover:text-red-600 text-xs flex items-center gap-1"
+                            title="删除角色"
+                          >
+                            <Trash2 size={12} />
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-xs text-gray-600 leading-relaxed overflow-hidden line-clamp-3" style={{ 
+                        display: '-webkit-box',
+                        WebkitBoxOrient: 'vertical',
+                        WebkitLineClamp: 3,
+                        lineClamp: 3,
+                        maxHeight: '4.5rem'
+                      }}>
+                        {role.prompt}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         );
       case 'materials':
         return (
@@ -766,6 +933,133 @@ export const AssetModal = React.memo(({ onClose, projects = [], onLoadProject, o
           </div>
         </div>
       </div>
+
+      {/* 角色管理模态框 */}
+      {showRoleManager && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={() => setShowRoleManager(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[450px] max-w-full border border-gray-100 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b pb-3 mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+                <Users size={20} /> 添加自定义角色
+              </h2>
+              <button onClick={() => setShowRoleManager(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">角色名称</label>
+                <input
+                  type="text"
+                  value={newRoleName}
+                  onChange={(e) => setNewRoleName(e.target.value)}
+                  placeholder="输入角色名称，如：专业编剧、小说家等"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">角色提示词</label>
+                <textarea
+                  value={newRolePrompt}
+                  onChange={(e) => setNewRolePrompt(e.target.value)}
+                  placeholder="输入角色的设定和特点，如：你是一位经验丰富的专业编剧，擅长创作引人入胜的故事情节..."
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none resize-none"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setNewRoleName('');
+                  setNewRolePrompt('');
+                  setShowRoleManager(false);
+                }}
+                className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  addCustomRole(newRoleName, newRolePrompt);
+                  setShowRoleManager(false);
+                }}
+                disabled={!newRoleName.trim() || !newRolePrompt.trim()}
+                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                添加角色
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 角色编辑模态框 */}
+      {showRoleEditor && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={() => setShowRoleEditor(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-[450px] max-w-full border border-gray-100 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b pb-3 mb-4">
+              <h2 className="text-lg font-bold flex items-center gap-2 text-gray-800">
+                <Pencil size={20} /> 修改角色
+              </h2>
+              <button onClick={() => setShowRoleEditor(false)} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">角色名称</label>
+                <input
+                  type="text"
+                  value={editingRoleName}
+                  onChange={(e) => setEditingRoleName(e.target.value)}
+                  placeholder="输入角色名称"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">角色提示词</label>
+                <textarea
+                  value={editingRolePrompt}
+                  onChange={(e) => setEditingRolePrompt(e.target.value)}
+                  placeholder="输入角色的设定和特点"
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowRoleEditor(false);
+                  setEditingRole(null);
+                  setEditingRoleName('');
+                  setEditingRolePrompt('');
+                }}
+                className="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  updateRole();
+                  setShowRoleEditor(false);
+                }}
+                disabled={!editingRoleName.trim() || !editingRolePrompt.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                保存修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
