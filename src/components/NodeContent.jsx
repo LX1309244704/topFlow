@@ -7,9 +7,8 @@ import apiClient from '../api/client.js';
 // 图片节点内容组件
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
   const modelOptions = [
-    { value: "imagen-4", label: "Imagen 4.0 (AI)" },
     { value: "nano-banana", label: "Nano Banana" },
-    { value: "sdxl", label: "SDXL Lightning" },
+    { value: "nano-banana-pro", label: "Nano Banana Pro" }
   ];
   const fileRef = useRef(null);
 
@@ -456,10 +455,8 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
 // 视频节点内容组件
 export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
   const videoModelOptions = [
-    {value:"svd",label:"Stable Video Diffusion"}, 
-    {value:"gen2",label:"Runway Gen-2"}, 
-    {value:"pika",label:"Pika Labs"}, 
-    {value:"luma",label:"Luma Dream Machine"}
+    {value:"sora2",label:"Sora 2.0"}, 
+    {value:"veo_3_1-fast",label:"veo_3_1-fast"}
   ];
   
   const handleEnhance = async () => {
@@ -532,7 +529,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </div>
         
         <div className="flex items-center gap-2 mt-1">
-          <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
+          <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
         
         {/* 底部操作栏 - 确保生成按钮在右下角 */}
