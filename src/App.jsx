@@ -1553,7 +1553,9 @@ export default function InfiniteCanvasApp() {
 
   // 创建分镜节点的全局函数
   const createStoryboardNodes = useCallback(async (sourceNode, scenes, referenceImage) => {
-    // 不再在源节点显示加载状态，改为在分镜节点显示
+    // 设置全局分镜生成状态，确保源节点显示正确的状态
+    setModeGeneratingState(true);
+    setModeSourceNodeId(sourceNode.id);
     setCurrentMode('storyboard');
     
     const newNodes = [];
@@ -1678,12 +1680,28 @@ export default function InfiniteCanvasApp() {
     // 等待所有分镜生成完成
     const results = await Promise.allSettled(generatePromises);
     
-    // 所有分镜生成完成后，重置全局模式状态
+    // 所有分镜生成完成后，重置全局模式状态和源节点的生成状态
     console.log(`分镜生成完成: ${successCount} 成功, ${failureCount} 失败`);
     console.log('分镜生成结果:', results);
     setModeGeneratingState(false);
     setModeSourceNodeId(null);
     setCurrentMode('generate');
+    
+    // 重置源节点的生成状态
+    handleUpdateWorkflowFixed(
+      prevNodes => prevNodes.map(n => 
+        n.id === sourceNode.id 
+          ? { 
+              ...n, 
+              data: { 
+                ...n.data, 
+                isGenerating: false 
+              } 
+            } 
+          : n
+      ),
+      null
+    );
   }, [handleUpdateWorkflowFixed, generateImage, generateImageFromRef]);
 
   // 更新分镜节点提示词的函数
@@ -1822,8 +1840,10 @@ export default function InfiniteCanvasApp() {
       
       if (refImage) {
         console.log(`生成4宫格漫画分镜图: 使用参考图 + 分镜描述`);
-        // 使用参考图生成4宫格漫画分镜图 - 图片不显示秒数
-        const gridPrompt = `请基于提供的参考图片和以下4个分镜描述，生成一张完整的4宫格漫画分镜图：
+        // 使用参考图生成4宫格漫画分镜图 - 优化提示词确保风格一致性
+        const gridPrompt = `请基于提供的参考图片的视觉风格和内容基调，生成一张完整的4宫格漫画分镜图。
+
+参考图片的风格和基调必须严格保持一致。
 
 分镜描述：
 1. ${processedDetails[0].description}
@@ -1831,12 +1851,13 @@ export default function InfiniteCanvasApp() {
 3. ${processedDetails[2].description}
 4. ${processedDetails[3].description}
 
-要求：
-- 生成一张图片，包含4个清晰的分镜格
-- 采用漫画风格，清晰的线条，鲜明的色彩
-- 每个分镜格要有明显的视觉分隔
-- 保持整体的视觉连贯性和故事性
-- 严格按照4宫格布局排列
+关键要求：
+- 严格保持与参考图片相同的视觉风格：角色设计、色彩调性、光影效果、艺术风格
+- 生成一张图片，包含4个清晰的分镜格，采用标准4宫格布局
+- 每个分镜格要有明显的视觉分隔，但保持整体视觉连贯性
+- 确保人物/角色外观、服装、发型等细节与参考图完全一致
+- 保持相同的背景环境、光照条件和氛围
+- 严格按照参考图的艺术风格（如写实、卡通、动漫、油画等）
 - 采用等比分割，确保每个分镜格大小一致
 - 如果有角色对话内容，请使用中文显示
 - 图片中不要显示任何文本或数字，包括秒数信息`;
@@ -1913,10 +1934,26 @@ export default function InfiniteCanvasApp() {
       );
     }
     
-    // 生成完成后，重置全局模式状态
+    // 生成完成后，重置全局模式状态和源节点的生成状态
     setModeGeneratingState(false);
     setModeSourceNodeId(null);
     setCurrentMode('generate');
+    
+    // 重置源节点的生成状态
+    handleUpdateWorkflowFixed(
+      prevNodes => prevNodes.map(n => 
+        n.id === sourceNode.id 
+          ? { 
+              ...n, 
+              data: { 
+                ...n.data, 
+                isGenerating: false 
+              } 
+            } 
+          : n
+      ),
+      null
+    );
   }, [handleUpdateWorkflowFixed, generateImage, generateImageFromRef]);
 
   // API Consumers requiring state update
@@ -2172,6 +2209,22 @@ export default function InfiniteCanvasApp() {
       return;
     }
     
+    // 立即设置源节点的生成状态，提供即时反馈
+    handleUpdateWorkflowFixed(
+      prevNodes => prevNodes.map(n => 
+        n.id === sourceId 
+          ? { 
+              ...n, 
+              data: { 
+                ...n.data, 
+                isGenerating: true 
+              } 
+            } 
+          : n
+      ),
+      null
+    );
+    
     // 使用优化后的createBatchNodes函数
     const { newNodes, newEdges } = createBatchNodes(srcNode, srcNode.data.batchSize || 1, nodes, edges);
     
@@ -2202,6 +2255,26 @@ export default function InfiniteCanvasApp() {
                 return curr;
             }));
         }
+    });
+    
+    // 等待所有批量生成任务完成后，重置源节点的生成状态
+    Promise.allSettled(newNodes.filter(n => n.type === 'image').map(n => 
+      apiFunctions.generateImage(n.data.prompt, n.data.model || 'nano-banana', n.data.ratio)
+    )).then(() => {
+      handleUpdateWorkflowFixed(
+        prevNodes => prevNodes.map(n => 
+          n.id === sourceId 
+            ? { 
+                ...n, 
+                data: { 
+                  ...n.data, 
+                  isGenerating: false 
+                } 
+              } 
+            : n
+        ),
+        null
+      );
     });
   }, [nodes, edges, handleUpdateWorkflowFixed, apiFunctions]);
 

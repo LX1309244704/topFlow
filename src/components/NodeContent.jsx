@@ -253,8 +253,15 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   const handleStoryboard = async () => {
     if (!node.data.prompt) return;
     
-    // 设置生成状态
+    // 立即设置源节点的生成状态，提供即时反馈
     updateNode(node.id, { data: { ...node.data, isGenerating: true } });
+    
+    // 设置全局分镜生成状态
+    if (window.topFlow && window.topFlow.setModeGenerating && window.topFlow.setModeSourceNode && window.topFlow.setCurrentMode) {
+      window.topFlow.setModeGenerating(true);
+      window.topFlow.setModeSourceNode(node.id);
+      window.topFlow.setCurrentMode('storyboard');
+    }
     
     try {
       // 根据是否有参考图片来构建不同的提示词
@@ -343,25 +350,62 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       // 尝试解析JSON格式（如果AI返回了JSON）
       try {
         let cleanResponse = response;
-        if (response.includes('```json')) {
-          cleanResponse = response.replace(/```json\s*/, '').replace(/```\s*$/, '');
+        
+        // 首先尝试提取JSON部分
+        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          cleanResponse = jsonMatch[1].trim();
+        } else if (response.includes('{') && response.includes('}')) {
+          // 如果没有代码块标记，尝试提取第一个JSON对象
+          const jsonStart = response.indexOf('{');
+          const jsonEnd = response.lastIndexOf('}') + 1;
+          if (jsonStart !== -1 && jsonEnd > jsonStart) {
+            cleanResponse = response.substring(jsonStart, jsonEnd);
+          }
         }
         
+        console.log('尝试解析的JSON内容:', cleanResponse);
+        
         const jsonData = JSON.parse(cleanResponse);
-        if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
-          // 使用JSON格式的数据
-          scenes = jsonData.frames.map(frame => frame.imagePrompt);
-          console.log('JSON格式分镜数据:', jsonData.frames);
+        
+        // 支持多种JSON格式
+        if (jsonData && jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
+          // 使用keyframe_sequence格式的数据
+          scenes = jsonData.keyframe_sequence.map(frame => frame.description);
+          console.log('JSON格式分镜数据 (keyframe_sequence):', jsonData.keyframe_sequence);
+        } else if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
+          // 使用frames格式的数据
+          scenes = jsonData.frames.map(frame => frame.imagePrompt || frame.description);
+          console.log('JSON格式分镜数据 (frames):', jsonData.frames);
         } else {
-          throw new Error('Invalid JSON format');
+          throw new Error('Invalid JSON format - no valid array found');
         }
       } catch (error) {
-        // 如果不是JSON格式，使用旧的分行处理方式
-        console.log('分镜模式使用文本分行处理方式');
-        scenes = response.split('\n')
+        // 如果不是JSON格式，使用智能文本处理方式
+        console.log('JSON解析失败，使用智能文本处理方式:', error.message);
+        
+        // 提取真正有用的描述性文本
+        const lines = response.split('\n')
           .map(s => s.trim())
-          .filter(s => s.length > 0 && !s.includes('镜头') && !s.includes('要求') && !s.includes('分镜'))
+          .filter(s => {
+            // 过滤掉：空行、代码块标记、JSON结构标记、描述性标题
+            return s.length > 0 && 
+                   !s.includes('```') && 
+                   !s.includes('{') && 
+                   !s.includes('}') &&
+                   !s.includes('镜头') && 
+                   !s.includes('要求') && 
+                   !s.includes('分镜') &&
+                   !s.includes('关键帧') &&
+                   !s.includes('描述') &&
+                   !s.includes('JSON格式') &&
+                   !s.includes('专业') &&
+                   !s.includes('基于');
+          })
           .slice(0, 4);
+        
+        scenes = lines;
+        console.log('智能处理后的分镜描述:', scenes);
       }
 
       console.log('处理后的分镜描述:', scenes);
@@ -413,7 +457,8 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         await window.topFlow.createStoryboardNodes(node, defaultScenes, node.data.generatedImage);
       }
     } finally {
-      updateNode(node.id, { data: { ...node.data, isGenerating: false } });
+      // 分镜生成状态由全局状态管理，不需要重置源节点的生成状态
+      // 全局状态会在 createStoryboardNodes 中正确重置
     }
   };
 
@@ -429,64 +474,37 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       let gridPrompt;
       
       if (node.data.generatedImage) {
-        // 如果有参考图片，要求AI生成JSON格式的关键帧序列，强调视觉一致性
-        gridPrompt = `请仔细分析参考图片的视觉风格、构图、色调、人物特征等元素，生成的分镜关键帧需要保持与参考图片的视觉一致性。
+        // 如果有参考图片，使用多模态分析API分析参考图，生成风格一致的分镜描述
+        console.log('开始使用多模态分析API分析参考图片...');
+        
+        // 使用多模态API分析参考图片的视觉特征
+        const imageAnalysisPrompt = `请仔细分析提供的参考图片，提取以下视觉特征：
+1. 艺术风格（如：写实、卡通、动漫、油画、水彩等）
+2. 色彩调性（如：明亮、暗沉、暖色调、冷色调等）
+3. 人物特征（如：外貌、服装、发型、表情等）
+4. 背景环境（如：室内、室外、城市、自然等）
+5. 光照条件（如：自然光、室内灯光、黄昏、夜晚等）
 
-参考图片描述：${node.data.prompt}
+请返回一个简洁的视觉特征描述，用于后续生成风格一致的漫画分镜。`;
+        
+        // 使用多模态API分析参考图片
+        const visualFeatures = await apiClient.generateTextWithImage(imageAnalysisPrompt, node.data.generatedImage);
+        console.log('参考图片视觉特征分析结果:', visualFeatures);
+        
+        gridPrompt = `基于参考图片的视觉特征，生成4个连贯的漫画分镜描述。
 
-请生成一个JSON格式的关键帧序列，每个帧包含：
-1. index - 帧序号
-2. shotType - 镜头类型
-3. timePoint - 时间点
-4. visualDescription - 视觉描述
-5. composition - 构图信息
-6. continuity - 连续性说明
-7. imagePrompt - 图像提示词（需要包含保持与参考图片一致的视觉元素）
+参考图片视觉特征：${visualFeatures}
 
-重要提示：图像提示词需要包含明确的视觉一致性要求，如"保持与参考图片相同的艺术风格"、"延续参考图片的色调"、"保持人物特征一致"等。
+重要要求：
+1. 每个分镜描述必须严格保持与参考图片完全相同的视觉风格
+2. 保持相同的人物特征、服装、发型、表情等所有细节
+3. 延续相同的背景环境、光照条件和色彩调性
+4. 按照故事发展顺序：开场-发展-高潮-结局
+5. 每个分镜描述控制在25字以内，适合漫画分镜
+6. 每个分镜标注时长："描述内容 (时长：X秒)"
+7. 直接返回4个描述，每行一个，不要其他内容
 
-请严格按照以下JSON格式返回，只返回JSON数据，不包含其他文字：
-
-{
-  "frames": [
-    {
-      "index": 1,
-      "shotType": "开场镜头",
-      "timePoint": "0-3秒",
-      "visualDescription": "视觉描述内容",
-      "composition": "构图信息",
-      "continuity": "连续性说明",
-      "imagePrompt": "图像提示词，包含视觉一致性要求"
-    },
-    {
-      "index": 2,
-      "shotType": "动作镜头",
-      "timePoint": "3-6秒",
-      "visualDescription": "视觉描述内容",
-      "composition": "构图信息",
-      "continuity": "连续性说明",
-      "imagePrompt": "图像提示词，包含视觉一致性要求"
-    },
-    {
-      "index": 3,
-      "shotType": "反应镜头",
-      "timePoint": "6-9秒",
-      "visualDescription": "视觉描述内容",
-      "composition": "构图信息",
-      "continuity": "连续性说明",
-      "imagePrompt": "图像提示词，包含视觉一致性要求"
-    },
-    {
-      "index": 4,
-      "shotType": "结局镜头",
-      "timePoint": "9-12秒",
-      "visualDescription": "视觉描述内容",
-      "composition": "构图信息",
-      "continuity": "连续性说明",
-      "imagePrompt": "图像提示词，包含视觉一致性要求"
-    }
-  ]
-}`;
+请确保生成的4个分镜在视觉风格上与参考图片100%一致，包括所有视觉元素。`;
       } else {
         // 如果没有参考图片，生成4宫格漫画分镜描述
         gridPrompt = `基于以下场景描述，生成4个连续的漫画分镜头画面描述，用于创建一张完整的4宫格漫画分镜图：
@@ -521,29 +539,66 @@ ${node.data.prompt}
       let isJsonFormat = false;
       
       try {
-        // 预处理响应：移除可能的代码块标记
         let cleanResponse = response;
-        if (response.includes('```json')) {
-          cleanResponse = response.replace(/```json\s*/, '').replace(/```\s*$/, '');
+        
+        // 首先尝试提取JSON部分
+        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+        if (jsonMatch) {
+          cleanResponse = jsonMatch[1].trim();
+        } else if (response.includes('{') && response.includes('}')) {
+          // 如果没有代码块标记，尝试提取第一个JSON对象
+          const jsonStart = response.indexOf('{');
+          const jsonEnd = response.lastIndexOf('}') + 1;
+          if (jsonStart !== -1 && jsonEnd > jsonStart) {
+            cleanResponse = response.substring(jsonStart, jsonEnd);
+          }
         }
         
-        // 尝试解析JSON格式响应
+        console.log('尝试解析的网格JSON内容:', cleanResponse);
+        
         jsonData = JSON.parse(cleanResponse);
+        
+        // 支持多种JSON格式
         if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
-          // 使用JSON格式的数据
-          scenes = jsonData.frames.map(frame => `${frame.imagePrompt} (时长：${frame.timePoint})`);
-          console.log('JSON格式网格分镜数据:', jsonData.frames);
+          // 使用frames格式的数据
+          scenes = jsonData.frames.map(frame => `${frame.imagePrompt || frame.description} (时长：${frame.timePoint || '3-5秒'})`);
+          console.log('JSON格式网格分镜数据 (frames):', jsonData.frames);
+          isJsonFormat = true;
+        } else if (jsonData && jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
+          // 使用keyframe_sequence格式的数据
+          scenes = jsonData.keyframe_sequence.map(frame => `${frame.description} (时长：${frame.timestamp || '3-5秒'})`);
+          console.log('JSON格式网格分镜数据 (keyframe_sequence):', jsonData.keyframe_sequence);
           isJsonFormat = true;
         } else {
-          throw new Error('Invalid JSON format');
+          throw new Error('Invalid JSON format - no valid array found');
         }
       } catch (error) {
-        // 如果不是JSON格式，使用旧的分行处理方式
-        console.log('不是JSON格式，使用旧的处理方式，错误:', error.message);
-        scenes = response.split('\n')
+        // 如果不是JSON格式，使用智能文本处理方式
+        console.log('网格JSON解析失败，使用智能文本处理方式:', error.message);
+        
+        // 提取真正有用的描述性文本
+        const lines = response.split('\n')
           .map(s => s.trim())
-          .filter(s => s.length > 0 && !s.includes('镜头') && !s.includes('要求') && !s.includes('分镜'))
+          .filter(s => {
+            // 过滤掉：空行、代码块标记、JSON结构标记、描述性标题
+            return s.length > 0 && 
+                   !s.includes('```') && 
+                   !s.includes('{') && 
+                   !s.includes('}') &&
+                   !s.includes('镜头') && 
+                   !s.includes('要求') && 
+                   !s.includes('分镜') &&
+                   !s.includes('关键帧') &&
+                   !s.includes('描述') &&
+                   !s.includes('JSON格式') &&
+                   !s.includes('专业') &&
+                   !s.includes('基于') &&
+                   !s.includes('漫画分镜顺序');
+          })
           .slice(0, 4);
+        
+        scenes = lines;
+        console.log('智能处理后的网格分镜描述:', scenes);
       }
 
       console.log('处理后的网格分镜描述:', scenes);
@@ -577,8 +632,8 @@ ${node.data.prompt}
     } catch (error) {
       console.error('4宫格漫画分镜图生成失败:', error);
     } finally {
-      // 重置源节点的生成状态，确保按钮状态正常
-      updateNode(node.id, { data: { ...node.data, isGenerating: false } });
+      // 网格生成状态由全局状态管理，不需要重置源节点的生成状态
+      // 全局状态会在 createGridNodes 中正确重置
     }
   };
 
@@ -598,6 +653,9 @@ ${node.data.prompt}
     // 确保事件对象存在
     const event = e || { stopPropagation: () => {} };
     const mode = node.data.mode || "generate";
+    
+    // 立即设置生成状态，确保用户立即看到反馈
+    updateNode(node.id, { data: { ...node.data, isGenerating: true } });
     
     switch (mode) {
       case "storyboard":
@@ -680,9 +738,18 @@ ${node.data.prompt}
   return (
     <>
       <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: currentAspect }}>
-        {node.data.isGenerating ? (
+        {/* 分镜生成中的源节点状态显示 */}
+        {isModeSource && isModeGenerating && currentMode === 'storyboard' ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-purple-50/50 backdrop-blur-sm z-10">
+            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-2" />
+            <span className="text-xs text-purple-600 font-bold animate-pulse">生成分镜中...</span>
+          </div>
+        ) : node.data.isGenerating ? (
           <GenerationIndicator text="Generating..." />
-        ) : node.data.generatedImage ? (
+        ) : null}
+        
+        {/* 正常图片显示 */}
+        {node.data.generatedImage ? (
           <>
             <img src={node.data.generatedImage} alt="Gen" className="w-full h-full object-cover select-none" draggable={false} onDragStart={(e) => e.preventDefault()} />
             <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -716,7 +783,17 @@ ${node.data.prompt}
           <NodeSelect value={node.data.model || "nano-banana"} options={modelOptions} onChange={v => updateNode(node.id, { data: {...node.data, model: v} })} className="flex-1" />
           <NodeSelect value={node.data.mode || "generate"} options={modeOptions} onChange={v => updateNode(node.id, { data: {...node.data, mode: v} })} className="w-32" />
         </div>
-        <BottomActionBar>
+        <BottomActionBar
+          actionButton={
+            <GenerateButton 
+              onClick={isDisabled ? undefined : handleModeAction} 
+              isDisabled={isDisabled}
+              text={getButtonConfig().text}
+              color={getButtonColor()}
+              icon={getButtonIcon(getButtonConfig().icon)}
+            />
+          }
+        >
           <AspectRatioSelector 
             value={node.data.ratio || "4:3"} 
             onChange={v => { 
@@ -740,14 +817,6 @@ ${node.data.prompt}
             <ImageIcon size={14}/>
           </button>
           <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload} />
-          
-          <GenerateButton 
-            onClick={isDisabled ? undefined : handleModeAction} 
-            isDisabled={isDisabled}
-            text={getButtonConfig().text}
-            color={getButtonColor()}
-            icon={getButtonIcon(getButtonConfig().icon)}
-          />
         </BottomActionBar>
       </div>
 
@@ -1157,7 +1226,15 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
         
-        <BottomActionBar>
+        <BottomActionBar
+          actionButton={
+            <GenerateButton 
+              onClick={handleGenerate} 
+              text="生成"
+              icon={<Wand2 size={10} className="fill-white" />}
+            />
+          }
+        >
           <AspectRatioSelector 
             value={node.data.ratio || "16:9"} 
             onChange={v => updateNode(node.id, { data: {...node.data, ratio: v} })}
@@ -1174,12 +1251,6 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               {value:1,label:"1x"}, 
               {value:2,label:"2x"}
             ]}
-          />
-          
-          <GenerateButton 
-            onClick={handleGenerate} 
-            text="生成"
-            icon={<Wand2 size={10} className="fill-white" />}
           />
         </BottomActionBar>
       </div>
