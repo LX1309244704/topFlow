@@ -1,17 +1,199 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, Maximize2, X } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
 import apiClient from '../api/client.js';
 
+// 共用的放大弹窗组件
+const ZoomModal = ({ isOpen, onClose, title, children }) => {
+  if (!isOpen) return null;
+  
+  return createPortal(
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={onClose}>
+      <div className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute top-4 right-4 flex justify-between items-center gap-2">
+          <div className="text-lg font-bold text-gray-800">{title}</div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+            <X size={20} className="text-gray-600" />
+          </button>
+        </div>
+        <div className="p-4">
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// 共用的媒体操作按钮组件
+const MediaActionButtons = ({ 
+  onZoom, 
+  onDownload, 
+  onClear, 
+  showDownload = true, 
+  isDisabled = false,
+  downloadTitle = "下载",
+  clearTitle = "清除"
+}) => {
+  if (isDisabled) return null;
+  
+  return (
+    <div className="flex gap-2">
+      <button onClick={onZoom} className="p-1.5 bg-white/80 hover:bg-white text-blue-600 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="放大查看">
+        <Maximize2 size={14} />
+      </button>
+      {showDownload && (
+        <button onClick={onDownload} className="p-1.5 bg-white/80 hover:bg-white text-gray-700 rounded-full shadow-sm backdrop-blur-sm transition-colors" title={downloadTitle}>
+          <Download size={14} />
+        </button>
+      )}
+      <button onClick={onClear} className="p-1.5 bg-white/80 hover:bg-white text-red-500 rounded-full shadow-sm backdrop-blur-sm transition-colors" title={clearTitle}>
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+};
+
+// 共用的生成状态指示器组件
+const GenerationIndicator = ({ text, color = "blue" }) => {
+  const colorClasses = {
+    blue: "border-blue-500 text-blue-600",
+    green: "border-green-500 text-green-600",
+    purple: "border-purple-500 text-purple-600",
+  };
+  
+  const spinnerColor = colorClasses[color] || colorClasses.blue;
+  
+  return (
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
+      <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin mb-2 ${spinnerColor}`} />
+      <span className={`text-xs font-bold animate-pulse ${spinnerColor}`}>{text}</span>
+    </div>
+  );
+};
+
+// 共用的输入框组件
+const PromptInput = ({ 
+  value, 
+  onChange, 
+  placeholder, 
+  onEnhance, 
+  rows = 2,
+  onMouseDown,
+  onWheel
+}) => (
+  <div className="relative">
+    <textarea 
+      className="w-full text-sm bg-transparent border border-gray-100 rounded-md p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" 
+      placeholder={placeholder} 
+      rows={rows} 
+      value={value} 
+      onChange={onChange} 
+      onMouseDown={onMouseDown} 
+      onWheel={onWheel} 
+    />
+    <button onClick={onEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors">
+      <Wand2 size={14} />
+    </button>
+  </div>
+);
+
+// 共用的底部操作栏组件
+const BottomActionBar = ({ 
+  children, 
+  actionButton, 
+  showBorder = true 
+}) => (
+  <div className={`flex justify-between items-center ${showBorder ? 'pt-2 border-t border-gray-50 w-full' : ''}`}>
+    <div className="flex gap-1.5">
+      {children}
+    </div>
+    {actionButton}
+  </div>
+);
+
+// 共用的比例选择器组件
+const AspectRatioSelector = ({ value, onChange, options = [
+  {value:"16:9",label:"16:9"}, 
+  {value:"9:16",label:"9:16"}, 
+  {value:"1:1",label:"1:1"}, 
+  {value:"4:3",label:"4:3"}, 
+  {value:"3:4",label:"3:4"}
+] }) => (
+  <NodeSelect 
+    value={value} 
+    options={options} 
+    icon={Square} 
+    onChange={onChange} 
+    className="w-20" 
+  />
+);
+
+// 共用的批处理大小选择器组件
+const BatchSizeSelector = ({ value, onChange, options = [
+  {value:1,label:"1x"}, 
+  {value:2,label:"2x"}, 
+  {value:4,label:"4x"}
+] }) => (
+  <NodeSelect 
+    value={value} 
+    options={options} 
+    icon={Layers} 
+    onChange={v => onChange(parseInt(v))} 
+    className="w-16" 
+  />
+);
+
+// 共用的生成按钮组件
+const GenerateButton = ({ 
+  onClick, 
+  text = "生成", 
+  isDisabled = false,
+  color = "black",
+  icon = <Wand2 size={10} className="fill-white" />
+}) => {
+  const colorClasses = {
+    black: "bg-black text-white hover:bg-gray-800",
+    blue: "bg-blue-600 text-white hover:bg-blue-700",
+    green: "bg-green-600 text-white hover:bg-green-700",
+    purple: "bg-purple-600 text-white hover:bg-purple-700",
+  };
+  
+  const buttonColor = colorClasses[color] || colorClasses.black;
+  
+  return (
+    <button 
+      onClick={isDisabled ? undefined : onClick} 
+      disabled={isDisabled}
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+        isDisabled ? 'cursor-not-allowed opacity-50' : 
+        `${buttonColor} hover:shadow-lg active:scale-95`
+      }`}
+    >
+      {icon}
+      {text}
+    </button>
+  );
+};
+
 // 图片节点内容组件
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
   const modelOptions = [
-    { value: "imagen-4", label: "Imagen 4.0 (AI)" },
     { value: "nano-banana", label: "Nano Banana" },
-    { value: "sdxl", label: "SDXL Lightning" },
+    { value: "nano-banana-pro", label: "Nano Banana Pro" },
   ];
+
+  // 模式选项
+  const modeOptions = [
+    { value: "generate", label: "生成模式" },
+    { value: "storyboard", label: "分镜模式" },
+    { value: "grid", label: "网格模式" },
+  ];
+
   const fileRef = useRef(null);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
     const generatedImage = node.data.generatedImage;
@@ -59,26 +241,458 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     updateNode(node.id, { data: { ...node.data, generatedImage: null } });
   };
 
+  const handleZoom = () => {
+    setIsZoomed(true);
+  };
+
+  const handleCloseZoom = () => {
+    setIsZoomed(false);
+  };
+
+  // 分镜模式处理函数
+  const handleStoryboard = async () => {
+    if (!node.data.prompt) return;
+    
+    // 设置生成状态
+    updateNode(node.id, { data: { ...node.data, isGenerating: true } });
+    
+    try {
+      // 根据是否有参考图片来构建不同的提示词
+      let storyboardPrompt;
+      
+      if (node.data.generatedImage) {
+        // 如果有参考图片，使用优化的"启承转结"逻辑生成分镜
+        storyboardPrompt = `你是一位专业的视频预可视化艺术家，专精于为AI视频生成创作首尾帧驱动的连贯关键帧序列。
+
+请基于提供的图像和基础提示词，生成4个视觉连续的关键帧描述，要求：
+
+严格视觉连续性：
+- 所有4个关键帧必须基于同一源图像元素
+- 保持相同：人物/物体、服装/外观、环境背景、光照条件、色彩风格
+- 仅允许变化：姿势、表情、镜头构图、相机角度、部分遮挡
+
+首尾帧视频生成优化：
+- 关键帧#1与关键帧#4应形成自然的动作或状态循环
+- 关键帧之间的变化需平滑、线性可预测，便于AI插值
+
+四帧叙事逻辑：
+- 关键帧1：初始状态（视频起点）
+- 关键帧2：动作发展/情绪推进
+- 关键帧3：变化高潮/转折点
+- 关键帧4：结束状态（视频终点，可与起点呼应）
+
+基础提示词: ${node.data.prompt}
+
+请按以下格式输出每个关键帧的详细描述：
+
+【KF#/4 | 镜头类型 | 视频时间点】
+画面描述：详细的视觉内容，包括所有可见元素的状态
+构图参数：视角、景别、焦点主体
+连续性说明：与前后帧的视觉连接点
+
+将上面的提示词输出内容使用json格式输出，方便分镜生成解析生成分镜图的提示词`;
+      } else {
+        // 如果没有参考图片，使用优化的"启承转结"逻辑
+        storyboardPrompt = `你是一位专业的视频预可视化艺术家，专精于为AI视频生成创作首尾帧驱动的连贯关键帧序列。
+
+请基于基础提示词，生成4个视觉连续的关键帧描述，要求：
+
+严格视觉连续性：
+- 所有4个关键帧必须基于同一场景设定
+- 保持一致：人物设定、环境风格、色彩基调、光照条件
+- 仅允许变化：姿势动作、表情变化、镜头角度、构图景别
+
+首尾帧视频生成优化：
+- 关键帧#1与关键帧#4应形成自然的动作循环
+- 关键帧之间的变化需平滑、可预测，便于AI插值
+
+四帧叙事逻辑：
+- 关键帧1：启 - 初始状态建立
+- 关键帧2：承 - 动作发展推进  
+- 关键帧3：转 - 变化高潮转折
+- 关键帧4：结 - 结束状态收尾
+
+基础提示词: ${node.data.prompt}
+
+请按以下格式输出每个关键帧的详细描述：
+
+【KF#/4 | 镜头类型 | 视频时间点】
+画面描述：详细的视觉内容，包括所有可见元素的状态
+构图参数：视角、景别、焦点主体
+连续性说明：与前后帧的视觉连接点
+
+将上面的提示词输出内容使用json格式输出，方便分镜生成解析生成分镜图的提示词`;
+      }
+
+      console.log('生成分镜提示词，有参考图片:', !!node.data.generatedImage);
+      
+      // 如果有参考图片，使用多模态分析API；否则使用普通文本生成API
+      let response;
+      if (node.data.generatedImage) {
+        // 使用多模态分析API，将参考图片传递给AI进行分析
+        response = await apiClient.generateTextWithImage(storyboardPrompt, node.data.generatedImage);
+      } else {
+        // 没有参考图片时使用普通文本生成API
+        response = await generateText(storyboardPrompt);
+      }
+      console.log('AI返回的分镜描述:', response);
+      
+      // 处理返回的分镜描述
+      let scenes = [];
+      
+      // 尝试解析JSON格式（如果AI返回了JSON）
+      try {
+        let cleanResponse = response;
+        if (response.includes('```json')) {
+          cleanResponse = response.replace(/```json\s*/, '').replace(/```\s*$/, '');
+        }
+        
+        const jsonData = JSON.parse(cleanResponse);
+        if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
+          // 使用JSON格式的数据
+          scenes = jsonData.frames.map(frame => frame.imagePrompt);
+          console.log('JSON格式分镜数据:', jsonData.frames);
+        } else {
+          throw new Error('Invalid JSON format');
+        }
+      } catch (error) {
+        // 如果不是JSON格式，使用旧的分行处理方式
+        console.log('分镜模式使用文本分行处理方式');
+        scenes = response.split('\n')
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.includes('镜头') && !s.includes('要求') && !s.includes('分镜'))
+          .slice(0, 4);
+      }
+
+      console.log('处理后的分镜描述:', scenes);
+
+      // 如果AI返回的分镜描述不足4个，使用默认分镜描述
+      if (scenes.length < 4) {
+        const defaultScenes = node.data.generatedImage ? [
+          `${node.data.prompt} - 保持原图构图和主体`,
+          `${node.data.prompt} - 调整视角和角度`,
+          `${node.data.prompt} - 改变距离和焦点`,
+          `${node.data.prompt} - 展示细节和结果`
+        ] : [
+          `${node.data.prompt} - 远景全景`,
+          `${node.data.prompt} - 中景构图`,
+          `${node.data.prompt} - 近景特写`,
+          `${node.data.prompt} - 细节展示`
+        ];
+        
+        // 填充不足的场景
+        for (let i = scenes.length; i < 4; i++) {
+          scenes.push(defaultScenes[i]);
+        }
+      }
+
+      // 创建分镜节点并生成图片
+      if (window.topFlow && window.topFlow.createStoryboardNodes) {
+        console.log('开始创建分镜节点，使用优化后的提示词');
+        await window.topFlow.createStoryboardNodes(node, scenes, node.data.generatedImage);
+      }
+      
+    } catch (error) {
+      console.error('分镜提示词生成失败:', error);
+      
+      // 如果生成失败，使用默认分镜描述创建节点
+      const defaultScenes = node.data.generatedImage ? [
+        `${node.data.prompt} - 保持原图构图和主体`,
+        `${node.data.prompt} - 调整视角和角度`,
+        `${node.data.prompt} - 改变距离和焦点`,
+        `${node.data.prompt} - 展示细节和结果`
+      ] : [
+        `${node.data.prompt} - 远景全景`,
+        `${node.data.prompt} - 中景构图`,
+        `${node.data.prompt} - 近景特写`,
+        `${node.data.prompt} - 细节展示`
+      ];
+
+      if (window.topFlow && window.topFlow.createStoryboardNodes) {
+        console.log('使用默认分镜描述创建节点');
+        await window.topFlow.createStoryboardNodes(node, defaultScenes, node.data.generatedImage);
+      }
+    } finally {
+      updateNode(node.id, { data: { ...node.data, isGenerating: false } });
+    }
+  };
+
+  // 网格模式处理函数
+  const handleGrid = async () => {
+    if (!node.data.prompt) return;
+    
+    // 立即设置源节点的生成状态，提供即时反馈
+    updateNode(node.id, { data: { ...node.data, isGenerating: true } });
+    
+    try {
+      // 根据是否有参考图片来构建不同的提示词
+      let gridPrompt;
+      
+      if (node.data.generatedImage) {
+        // 如果有参考图片，要求AI生成JSON格式的关键帧序列，强调视觉一致性
+        gridPrompt = `请仔细分析参考图片的视觉风格、构图、色调、人物特征等元素，生成的分镜关键帧需要保持与参考图片的视觉一致性。
+
+参考图片描述：${node.data.prompt}
+
+请生成一个JSON格式的关键帧序列，每个帧包含：
+1. index - 帧序号
+2. shotType - 镜头类型
+3. timePoint - 时间点
+4. visualDescription - 视觉描述
+5. composition - 构图信息
+6. continuity - 连续性说明
+7. imagePrompt - 图像提示词（需要包含保持与参考图片一致的视觉元素）
+
+重要提示：图像提示词需要包含明确的视觉一致性要求，如"保持与参考图片相同的艺术风格"、"延续参考图片的色调"、"保持人物特征一致"等。
+
+请严格按照以下JSON格式返回，只返回JSON数据，不包含其他文字：
+
+{
+  "frames": [
+    {
+      "index": 1,
+      "shotType": "开场镜头",
+      "timePoint": "0-3秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    },
+    {
+      "index": 2,
+      "shotType": "动作镜头",
+      "timePoint": "3-6秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    },
+    {
+      "index": 3,
+      "shotType": "反应镜头",
+      "timePoint": "6-9秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    },
+    {
+      "index": 4,
+      "shotType": "结局镜头",
+      "timePoint": "9-12秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    }
+  ]
+}`;
+      } else {
+        // 如果没有参考图片，生成4宫格漫画分镜描述
+        gridPrompt = `基于以下场景描述，生成4个连续的漫画分镜头画面描述，用于创建一张完整的4宫格漫画分镜图：
+
+${node.data.prompt}
+
+要求：
+1. 采用漫画分镜的典型构图方式
+2. 每个描述控制在30字以内，适合AI图像生成
+3. 保持画面连贯性和故事性
+4. 每个分镜需要标注时长（秒数），格式："描述内容 (时长：X秒)"
+5. 直接返回4个描述，每行一个
+6. 确保描述适合生成一张包含4个分镜格的完整图片
+7. 如果有角色对话内容，请使用中文显示
+
+漫画分镜顺序：
+- 镜头1：开场镜头，建立场景和氛围 (时长：3-5秒)
+- 镜头2：主体动作或中文对话镜头 (时长：4-6秒)
+- 镜头3：反应镜头或细节特写 (时长：2-4秒)
+- 镜头4：结局或高潮镜头 (时长：3-5秒)
+
+请确保描述适合漫画风格的图像生成，所有对话内容使用中文，每个分镜都包含时长信息：`;
+      }
+
+      console.log('开始生成4宫格漫画分镜描述，有参考图片:', !!node.data.generatedImage);
+      const response = await generateText(gridPrompt);
+      console.log('AI返回的网格分镜描述:', response);
+      
+      // 处理返回的数据 - 尝试解析JSON格式
+      let scenes = [];
+      let jsonData = null;
+      let isJsonFormat = false;
+      
+      try {
+        // 预处理响应：移除可能的代码块标记
+        let cleanResponse = response;
+        if (response.includes('```json')) {
+          cleanResponse = response.replace(/```json\s*/, '').replace(/```\s*$/, '');
+        }
+        
+        // 尝试解析JSON格式响应
+        jsonData = JSON.parse(cleanResponse);
+        if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
+          // 使用JSON格式的数据
+          scenes = jsonData.frames.map(frame => `${frame.imagePrompt} (时长：${frame.timePoint})`);
+          console.log('JSON格式网格分镜数据:', jsonData.frames);
+          isJsonFormat = true;
+        } else {
+          throw new Error('Invalid JSON format');
+        }
+      } catch (error) {
+        // 如果不是JSON格式，使用旧的分行处理方式
+        console.log('不是JSON格式，使用旧的处理方式，错误:', error.message);
+        scenes = response.split('\n')
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.includes('镜头') && !s.includes('要求') && !s.includes('分镜'))
+          .slice(0, 4);
+      }
+
+      console.log('处理后的网格分镜描述:', scenes);
+
+      if (scenes.length < 4) {
+        // 如果AI返回不足4个场景，使用与漫画风格相关的基本分镜
+        const comicScenes = node.data.generatedImage ? [
+          `${node.data.prompt} - 漫画开场镜头，建立场景`,
+          `${node.data.prompt} - 漫画动作镜头，主体表演`,
+          `${node.data.prompt} - 漫画反应镜头，细节特写`,
+          `${node.data.prompt} - 漫画结局镜头，高潮收尾`
+        ] : [
+          `${node.data.prompt} - 漫画风格开场镜头`,
+          `${node.data.prompt} - 漫画风格动作镜头`,
+          `${node.data.prompt} - 漫画风格反应镜头`,
+          `${node.data.prompt} - 漫画风格结局镜头`
+        ];
+        
+        // 填充不足的场景
+        for (let i = scenes.length; i < 4; i++) {
+          scenes.push(comicScenes[i]);
+        }
+      }
+
+      // 创建网格节点
+      if (window.topFlow && window.topFlow.createGridNodes) {
+        console.log('开始创建4宫格漫画分镜图，场景数量:', scenes.length);
+        await window.topFlow.createGridNodes(node, scenes, node.data.generatedImage, jsonData);
+      }
+      
+    } catch (error) {
+      console.error('4宫格漫画分镜图生成失败:', error);
+    } finally {
+      // 重置源节点的生成状态，确保按钮状态正常
+      updateNode(node.id, { data: { ...node.data, isGenerating: false } });
+    }
+  };
+
   const currentAspect = node.data.aspectRatio || 4/3;
+  
+  // 检查是否处于模式生成状态
+  const isModeGenerating = window.topFlow && window.topFlow.isModeGenerating && window.topFlow.isModeGenerating();
+  const isModeSource = window.topFlow && window.topFlow.getModeSourceNode && window.topFlow.getModeSourceNode() === node.id;
+  const currentMode = window.topFlow && window.topFlow.getCurrentMode ? window.topFlow.getCurrentMode() : 'generate';
+  const nodeMode = node.data.mode || 'generate';
+  
+  // 禁用点击的状态 - 移除源节点的模式生成状态检查，只保留节点自身的生成状态
+  const isDisabled = node.data.isGenerating;
+
+  // 统一处理函数
+  const handleModeAction = (e) => {
+    // 确保事件对象存在
+    const event = e || { stopPropagation: () => {} };
+    const mode = node.data.mode || "generate";
+    
+    switch (mode) {
+      case "storyboard":
+        handleStoryboard();
+        break;
+      case "grid":
+        handleGrid();
+        break;
+      default:
+        handleGenerate(event);
+        break;
+    }
+  };
+
+  // 获取按钮文本和图标
+  const getButtonConfig = () => {
+    const mode = node.data.mode || "generate";
+    const isGenerating = node.data.isGenerating || (isModeSource && isModeGenerating);
+    
+    // 根据模式和生成状态返回不同的配置
+    if (isGenerating) {
+      switch (currentMode) {
+        case "storyboard":
+          return { text: "分镜中", icon: "storyboard", color: "purple" };
+        case "grid":
+          return { text: "网格中", icon: "grid", color: "green" };
+        default:
+          return { text: "生成中", icon: "generate", color: "blue" };
+      }
+    } else {
+      switch (mode) {
+        case "storyboard":
+          return { text: "分镜", icon: "storyboard", color: "default" };
+        case "grid":
+          return { text: "网格", icon: "grid", color: "default" };
+        default:
+          return { text: "生成", icon: "generate", color: "default" };
+      }
+    }
+  };
+
+  // 获取图标组件
+  const getButtonIcon = (iconType) => {
+    switch (iconType) {
+      case "storyboard":
+        return <Video size={10} className="fill-white" />;
+      case "grid":
+        return <Layers size={10} className="fill-white" />;
+      default:
+        return <Wand2 size={10} className="fill-white" />;
+    }
+  };
+
+  // 获取按钮颜色
+  const getButtonColor = () => {
+    const mode = node.data.mode || "generate";
+    const isGenerating = node.data.isGenerating || (isModeSource && isModeGenerating);
+    
+    if (isGenerating) {
+      switch (currentMode) {
+        case "storyboard":
+          return "purple";
+        case "grid":
+          return "green";
+        default:
+          return "black";
+      }
+    } else {
+      switch (mode) {
+        case "storyboard":
+          return "purple";
+        case "grid":
+          return "green";
+        default:
+          return "black";
+      }
+    }
+  };
 
   return (
     <>
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: currentAspect }}>
+      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: currentAspect }}>
         {node.data.isGenerating ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs text-blue-600 font-bold animate-pulse">Generating...</span>
-          </div>
+          <GenerationIndicator text="Generating..." />
         ) : node.data.generatedImage ? (
           <>
             <img src={node.data.generatedImage} alt="Gen" className="w-full h-full object-cover select-none" draggable={false} onDragStart={(e) => e.preventDefault()} />
-            <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-              <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 bg-white/80 hover:bg-white text-gray-700 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="下载图片">
-                <Download size={14} />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); handleClearImage(); }} className="p-1.5 bg-white/80 hover:bg-white text-red-500 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="清除图片">
-                <Trash2 size={14} />
-              </button>
+            <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+              <MediaActionButtons 
+                onZoom={() => handleZoom()}
+                onDownload={() => handleDownload()}
+                onClear={() => handleClearImage()}
+                downloadTitle="下载图片"
+                clearTitle="清除图片"
+              />
             </div>
           </>
         ) : (
@@ -89,58 +703,57 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       </div>
       <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
         {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
-        <div className="relative">
-          <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-md p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="描述画面..." rows={2} value={node.data.prompt || ''} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} />
-          <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors">
-            <Wand2 size={14} />
-          </button>
-        </div>
+        
+        <PromptInput 
+          value={node.data.prompt || ''} 
+          onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} 
+          placeholder="描述画面..." 
+          onEnhance={handleEnhance}
+          onMouseDown={e => e.stopPropagation()} 
+          onWheel={e => e.stopPropagation()}
+        />
         <div className="flex items-center gap-2 mt-1">
-          <NodeSelect value={node.data.model || "imagen-4"} options={modelOptions} onChange={v => updateNode(node.id, { data: {...node.data, model: v} })} className="flex-1" />
+          <NodeSelect value={node.data.model || "nano-banana"} options={modelOptions} onChange={v => updateNode(node.id, { data: {...node.data, model: v} })} className="flex-1" />
+          <NodeSelect value={node.data.mode || "generate"} options={modeOptions} onChange={v => updateNode(node.id, { data: {...node.data, mode: v} })} className="w-32" />
         </div>
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
-          <div className="flex gap-1.5">
-            <NodeSelect 
-              value={node.data.ratio || "4:3"} 
-              options={[
-                {value:"1:1",label:"1:1"}, 
-                {value:"4:3",label:"4:3"}, 
-                {value:"16:9",label:"16:9"}, 
-                {value:"3:4",label:"3:4"}, 
-                {value:"9:16",label:"9:16"}
-              ]} 
-              icon={Square} 
-              onChange={v => { 
-                const [w, h] = v.split(':').map(Number); 
-                updateNode(node.id, { 
-                  data: {...node.data, ratio: v, aspectRatio: w/h} 
-                }); 
-              }} 
-              className="w-20" 
-            />
-            <NodeSelect 
-              value={node.data.batchSize || 1} 
-              options={[
-                {value:1,label:"1x"}, 
-                {value:2,label:"2x"}, 
-                {value:4,label:"4x"}
-              ]} 
-              icon={Layers} 
-              onChange={v => updateNode(node.id, { 
-                data: {...node.data, batchSize: parseInt(v)} 
-              })} 
-              className="w-16" 
-            />
-            <button onClick={() => fileRef.current?.click()} className="p-1.5 hover:bg-gray-100 rounded text-gray-400">
-              <ImageIcon size={14}/>
-            </button>
-            <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload} />
-          </div>
-          <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95">
-            <Wand2 size={10} className="fill-white" />生成
+        <BottomActionBar>
+          <AspectRatioSelector 
+            value={node.data.ratio || "4:3"} 
+            onChange={v => { 
+              const [w, h] = v.split(':').map(Number); 
+              updateNode(node.id, { 
+                data: {...node.data, ratio: v, aspectRatio: w/h} 
+              }); 
+            }}
+          />
+          <BatchSizeSelector 
+            value={node.data.batchSize || 1} 
+            onChange={v => updateNode(node.id, { 
+              data: {...node.data, batchSize: v} 
+            })}
+          />
+          <button 
+            onClick={() => !isDisabled && fileRef.current?.click()} 
+            disabled={isDisabled}
+            className={`p-1.5 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'} rounded text-gray-400`}
+          >
+            <ImageIcon size={14}/>
           </button>
-        </div>
+          <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload} />
+          
+          <GenerateButton 
+            onClick={isDisabled ? undefined : handleModeAction} 
+            isDisabled={isDisabled}
+            text={getButtonConfig().text}
+            color={getButtonColor()}
+            icon={getButtonIcon(getButtonConfig().icon)}
+          />
+        </BottomActionBar>
       </div>
+
+      <ZoomModal isOpen={isZoomed} onClose={handleCloseZoom} title="图片预览">
+        <img src={node.data.generatedImage} alt="放大图片" className="w-full h-auto max-h-[80vh] object-contain" />
+      </ZoomModal>
     </>
   );
 };
@@ -462,6 +1075,8 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     {value:"luma",label:"Luma Dream Machine"}
   ];
   
+  const [isZoomed, setIsZoomed] = useState(false);
+  
   const handleEnhance = async () => {
     if (!node.data.prompt) return;
     updateNode(node.id, { data: { ...node.data, isGenerating: true } });
@@ -479,6 +1094,14 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false } });
   };
 
+  const handleZoom = () => {
+    setIsZoomed(true);
+  };
+
+  const handleCloseZoom = () => {
+    setIsZoomed(false);
+  };
+
   const imageCount = imageInputs.length;
   let inputStatusText = imageCount === 0 ? '文生视频模式 (T2V)' : imageCount === 1 ? '参考图生视频模式 (I2V)' : `首尾帧生视频模式 (${imageCount} Refs)`;
   let inputStatusColor = imageCount === 0 ? 'text-gray-500' : imageCount === 1 ? 'text-orange-500' : 'text-purple-500';
@@ -487,10 +1110,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     <>
       <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 16/9 }}>
         {node.data.isGenerating ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
-            <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs text-blue-600 font-bold animate-pulse">AI Processing...</span>
-          </div>
+          <GenerationIndicator text="AI Processing..." />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center group">
             {node.data.videoUrl ? (
@@ -501,15 +1121,15 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                 <Video size={64} className="text-blue-200/80" />
             )}
             {(node.data.videoUrl || node.data.generatedVideo) && !node.data.isGenerating && (
-              <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                {node.data.videoUrl && (
-                  <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 bg-white/80 hover:bg-white text-gray-700 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="下载视频">
-                    <Download size={14} />
-                  </button>
-                )}
-                <button onClick={(e) => { e.stopPropagation(); handleClearVideo(); }} className="p-1.5 bg-white/80 hover:bg-white text-red-500 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="清除视频">
-                  <Trash2 size={14} />
-                </button>
+              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                <MediaActionButtons 
+                  onZoom={() => handleZoom()}
+                  onDownload={() => handleDownload()}
+                  onClear={() => handleClearVideo()}
+                  showDownload={!!node.data.videoUrl}
+                  downloadTitle="下载视频"
+                  clearTitle="清除视频"
+                />
               </div>
             )}
           </div>
@@ -524,47 +1144,49 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
         </div>
         
-        <div className="relative">
-          <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-md p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} />
-          <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors">
-            <Wand2 size={14} />
-          </button>
-        </div>
+        <PromptInput 
+          value={node.data.prompt} 
+          onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} 
+          placeholder="视频描述..." 
+          onEnhance={handleEnhance}
+          onMouseDown={e => e.stopPropagation()} 
+          onWheel={e => e.stopPropagation()}
+        />
         
         <div className="flex items-center gap-2 mt-1">
           <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
         
-        {/* 底部操作栏 - 确保生成按钮在右下角 */}
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50 w-full">
-          <div className="flex gap-1.5">
-            <NodeSelect 
-              value={node.data.ratio || "16:9"} 
-              options={[
-                {value:"16:9",label:"16:9"}, 
-                {value:"9:16",label:"9:16"}, 
-                {value:"1:1",label:"1:1"}
-              ]} 
-              icon={Square} 
-              onChange={v => updateNode(node.id, { data: {...node.data, ratio: v} })} 
-              className="w-20" 
-            />
-            <NodeSelect 
-              value={node.data.batchSize || 1} 
-              options={[
-                {value:1,label:"1x"}, 
-                {value:2,label:"2x"}
-              ]} 
-              icon={Layers} 
-              onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} 
-              className="w-16" 
-            />
-          </div>
-          <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 ml-auto">
-            <Wand2 size={10} className="fill-white" />生成
-          </button>
-        </div>
+        <BottomActionBar>
+          <AspectRatioSelector 
+            value={node.data.ratio || "16:9"} 
+            onChange={v => updateNode(node.id, { data: {...node.data, ratio: v} })}
+            options={[
+              {value:"16:9",label:"16:9"}, 
+              {value:"9:16",label:"9:16"}, 
+              {value:"1:1",label:"1:1"}
+            ]}
+          />
+          <BatchSizeSelector 
+            value={node.data.batchSize || 1} 
+            onChange={v => updateNode(node.id, { data: {...node.data, batchSize: v} })}
+            options={[
+              {value:1,label:"1x"}, 
+              {value:2,label:"2x"}
+            ]}
+          />
+          
+          <GenerateButton 
+            onClick={handleGenerate} 
+            text="生成"
+            icon={<Wand2 size={10} className="fill-white" />}
+          />
+        </BottomActionBar>
       </div>
+
+      <ZoomModal isOpen={isZoomed} onClose={handleCloseZoom} title="图片预览">
+        <img src={node.data.generatedImage} alt="放大图片" className="w-full h-auto max-h-[80vh] object-contain" />
+      </ZoomModal>
     </>
   );
 };
@@ -792,6 +1414,10 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           </button>
         </div>
       </div>
+
+      <ZoomModal isOpen={isZoomed} onClose={handleCloseZoom} title="图片预览">
+        <img src={node.data.generatedImage} alt="放大图片" className="w-full h-auto max-h-[80vh] object-contain" />
+      </ZoomModal>
     </>
   );
 };

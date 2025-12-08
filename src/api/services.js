@@ -6,7 +6,8 @@ import {
   generateGeminiStreamText, 
   generateGeminiImage, 
   generateGeminiImageFromRef, 
-  generateGeminiStructuredSynopsis 
+  generateGeminiStructuredSynopsis,
+  generateGeminiTextWithImage
 } from './geminiService.js';
 import { generateSpeech } from './ttsService.js';
 import { generateSong } from './sunoService.js';
@@ -97,6 +98,16 @@ export const generateImageFromMultipleRefs = async (prompt, refImages, model, ra
   } else {
     return await generateGeminiImage(prompt, model, ratio);
   }
+};
+
+/**
+ * 统一多模态分析接口（支持图片分析的文本生成）
+ * @param {string} prompt - 文本生成提示词
+ * @param {string} refImage - 参考图像的Base64数据
+ * @returns {Promise<string>} 生成的文本
+ */
+export const generateTextWithImage = async (prompt, refImage) => {
+  return await generateGeminiTextWithImage(prompt, refImage);
 };
 
 /**

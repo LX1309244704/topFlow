@@ -1551,6 +1551,374 @@ export default function InfiniteCanvasApp() {
   }, []);
   const handleUpdateWorkflowFixed = handleUpdateWorkflow;
 
+  // 创建分镜节点的全局函数
+  const createStoryboardNodes = useCallback(async (sourceNode, scenes, referenceImage) => {
+    // 不再在源节点显示加载状态，改为在分镜节点显示
+    setCurrentMode('storyboard');
+    
+    const newNodes = [];
+    const newEdges = [];
+    const baseX = sourceNode.x + 400;
+    const baseY = sourceNode.y;
+    const verticalSpacing = 180;
+
+    // 创建4个分镜节点，初始显示生成状态
+    scenes.forEach((scene, index) => {
+      const newNodeId = Date.now() + index;
+      newNodes.push({
+        id: newNodeId,
+        type: 'image',
+        x: baseX + (index % 2) * 350,
+        y: baseY + Math.floor(index / 2) * verticalSpacing,
+        data: {
+          prompt: scene,
+          model: sourceNode.data.model || "nano-banana",
+          ratio: sourceNode.data.ratio || "16:9",
+          batchSize: 1,
+          aspectRatio: sourceNode.data.aspectRatio || 16/9,
+          isGenerating: true, // 初始显示生成状态，在分镜节点中显示加载
+          usingReference: !!referenceImage, // 标记是否使用参考图片
+          hidden: true // 初始隐藏图片，等生成成功后再显示
+        }
+      });
+
+      // 创建从源节点到分镜节点的连线
+      newEdges.push({
+        id: `edge-${sourceNode.id}-${newNodeId}`,
+        source: sourceNode.id,
+        target: newNodeId
+      });
+    });
+
+    // 批量添加节点和边
+    handleUpdateWorkflowFixed(
+      prevNodes => [...prevNodes, ...newNodes],
+      prevEdges => [...prevEdges, ...newEdges]
+    );
+
+    // 使用批量生成的方式生成分镜图片
+    let successCount = 0;
+    let failureCount = 0;
+    
+    // 并发生成所有分镜图片
+    const generatePromises = newNodes.map(async (node) => {
+      try {
+        let imageUrl;
+        
+        // 优先使用传入的referenceImage，如果没有则使用sourceNode的图片
+        const refImage = referenceImage || sourceNode.data.generatedImage;
+        
+        if (refImage) {
+          console.log(`分镜生成 ${node.id}: 使用参考图 + 提示词 "${node.data.prompt}"`);
+          // 使用参考图生成分镜
+          imageUrl = await generateImageFromRef(
+            node.data.prompt,              // 分镜提示词
+            refImage,                      // 参考图片
+            node.data.model,               // 模型参数
+            node.data.ratio                // 比例参数
+          );
+        } else {
+          console.log(`分镜生成 ${node.id}: 仅使用提示词 "${node.data.prompt}"`);
+          // 没有参考图片时使用普通生成
+          imageUrl = await generateImage(
+            node.data.prompt,
+            node.data.model,
+            node.data.ratio
+          );
+        }
+
+        // 更新节点状态 - 成功生成后显示图片
+        handleUpdateWorkflowFixed(
+          prevNodes => prevNodes.map(n => 
+            n.id === node.id 
+              ? { 
+                  ...n, 
+                  data: { 
+                    ...n.data, 
+                    generatedImage: imageUrl,
+                    isGenerating: false,
+                    hidden: false // 生成成功后显示图片
+                  } 
+                } 
+              : n
+          ),
+          null
+        );
+        successCount++;
+        return { nodeId: node.id, success: true, imageUrl };
+      } catch (error) {
+        console.error(`分镜图片生成失败 (节点 ${node.id}):`, error);
+        // 生成失败时重置生成状态，使用占位图片
+        const textContent = node.data.prompt ? node.data.prompt.split(/\s+/).slice(0, 3).join(' ') : '分镜';
+        const encodedText = encodeURIComponent(textContent + ` (分镜 ${node.id.toString().slice(-4)})`);
+        const mockW = 800;
+        const mockH = Math.round(mockW / (node.data.aspectRatio || 16/9));
+        const mockUrl = `https://placehold.co/${mockW}x${mockH}/e74c3c/ffffff?text=${encodedText}`;
+        
+        handleUpdateWorkflowFixed(
+          prevNodes => prevNodes.map(n => 
+            n.id === node.id 
+              ? { 
+                  ...n, 
+                  data: { 
+                    ...n.data, 
+                    generatedImage: mockUrl,
+                    isGenerating: false 
+                  } 
+                } 
+              : n
+          ),
+          null
+        );
+        failureCount++;
+        return { nodeId: node.id, success: false, error: error.message };
+      }
+    });
+
+    // 等待所有分镜生成完成
+    const results = await Promise.allSettled(generatePromises);
+    
+    // 所有分镜生成完成后，重置全局模式状态
+    console.log(`分镜生成完成: ${successCount} 成功, ${failureCount} 失败`);
+    console.log('分镜生成结果:', results);
+    setModeGeneratingState(false);
+    setModeSourceNodeId(null);
+    setCurrentMode('generate');
+  }, [handleUpdateWorkflowFixed, generateImage, generateImageFromRef]);
+
+  // 更新分镜节点提示词的函数
+  const updateStoryboardPrompts = useCallback((sourceNodeId, scenes) => {
+    // 找到所有从源节点连接的分镜节点
+    const storyboardNodes = nodes.filter(node => 
+      edges.some(edge => edge.source === sourceNodeId && edge.target === node.id)
+    );
+    
+    // 按创建顺序排序（假设ID越大的节点创建越晚）
+    const sortedNodes = [...storyboardNodes].sort((a, b) => a.id - b.id);
+    
+    // 更新前4个分镜节点的提示词
+    sortedNodes.slice(0, 4).forEach((node, index) => {
+      if (scenes[index]) {
+        handleUpdateWorkflowFixed(
+          prevNodes => prevNodes.map(n => 
+            n.id === node.id 
+              ? { 
+                  ...n, 
+                  data: { 
+                    ...n.data, 
+                    prompt: scenes[index] 
+                  } 
+                } 
+              : n
+          ),
+          null
+        );
+      }
+    });
+  }, [nodes, edges, handleUpdateWorkflowFixed]);
+
+  // 创建网格节点的全局函数
+  const createGridNodes = useCallback(async (sourceNode, details, referenceImage = null, jsonData = null) => {
+    // 无论源节点是否有图片，都设置全局生成状态，确保网格按钮显示"网格中"
+    setModeGeneratingState(true);
+    setModeSourceNodeId(sourceNode.id);
+    setCurrentMode('grid');
+    
+    // 只创建一个节点，用于显示包含4个分镜的单张图片
+    const newNodeId = Date.now();
+    const baseX = sourceNode.x + 400;
+    const baseY = sourceNode.y;
+    
+    // 处理分镜描述，提取秒数信息
+    let processedDetails = [];
+    
+    if (jsonData && jsonData.frames) {
+      // 使用JSON格式的数据
+      processedDetails = jsonData.frames.map(frame => ({
+        description: frame.imagePrompt,
+        duration: parseInt(frame.timePoint.split('-')[1].replace('秒', '')) || 3,
+        shotType: frame.shotType,
+        visualDescription: frame.visualDescription,
+        composition: frame.composition,
+        continuity: frame.continuity
+      }));
+    } else {
+      // 使用旧的文本格式数据
+      processedDetails = details.map(scene => {
+        // 提取秒数信息，格式："描述内容 (时长：X秒)"
+        const timeMatch = scene.match(/\(时长：([0-9]+)秒\)/);
+        const time = timeMatch ? parseInt(timeMatch[1]) : 3; // 默认3秒
+        
+        // 移除秒数信息，保留纯描述内容
+        const cleanScene = scene.replace(/\(时长：[0-9]+秒\)/g, '').trim();
+        
+        return {
+          description: cleanScene,
+          duration: time
+        };
+      });
+    }
+    
+    // 构建4宫格漫画分镜的提示词
+    const comicScenes = processedDetails.map(d => d.description).join('，');
+    const refImage = referenceImage || sourceNode.data.generatedImage;
+    
+    // 创建单个网格节点，用于显示4宫格漫画分镜图
+    const newNode = {
+      id: newNodeId,
+      type: 'image',
+      x: baseX,
+      y: baseY,
+      data: {
+        prompt: `${sourceNode.data.prompt} - 4宫格漫画分镜`,
+        model: sourceNode.data.model || "nano-banana",
+        ratio: sourceNode.data.ratio || "16:9", // 使用源图的比例参数
+        batchSize: 1,
+        aspectRatio: sourceNode.data.aspectRatio || 16/9, // 使用源图的宽高比
+        isGenerating: true, // 初始显示生成状态，在网格节点中显示加载
+        mode: 'grid', // 标记为网格模式
+        gridDetails: processedDetails.map(d => d.description), // 保存4个分镜的描述信息
+        gridDurations: processedDetails.map(d => d.duration), // 保存每个分镜的秒数
+        comicLabels: ["开场镜头", "动作镜头", "反应镜头", "结局镜头"], // 漫画分镜标签
+        isSingleGridImage: true, // 标记为单张分镜图
+        hidden: true, // 初始隐藏图片，等生成成功后再显示
+        // 为Sora2视频生成准备的完整提示词
+        sora2Prompts: processedDetails.map((detail, index) => ({
+          description: detail.description,
+          duration: detail.duration,
+          prompt: `${detail.description} - 时长：${detail.duration}秒`
+        })),
+        // JSON格式的关键帧数据
+        keyframeData: jsonData || {
+          frames: processedDetails.map((detail, index) => ({
+            index: index + 1,
+            shotType: detail.shotType || ["开场镜头", "动作镜头", "反应镜头", "结局镜头"][index],
+            timePoint: `0-${detail.duration}秒`,
+            visualDescription: detail.visualDescription || detail.description,
+            composition: detail.composition || "标准构图",
+            continuity: detail.continuity || "与前一帧保持视觉连贯性",
+            imagePrompt: detail.description
+          }))
+        }
+      }
+    };
+
+    // 创建从源节点到网格节点的连线
+    const newEdge = {
+      id: `edge-${sourceNode.id}-${newNodeId}`,
+      source: sourceNode.id,
+      target: newNodeId
+    };
+
+    // 添加节点和边
+    handleUpdateWorkflowFixed(
+      prevNodes => [...prevNodes, newNode],
+      prevEdges => [...prevEdges, newEdge]
+    );
+
+    try {
+      // 生成包含4个分镜的单张图片
+      let imageUrl;
+      
+      if (refImage) {
+        console.log(`生成4宫格漫画分镜图: 使用参考图 + 分镜描述`);
+        // 使用参考图生成4宫格漫画分镜图 - 图片不显示秒数
+        const gridPrompt = `请基于提供的参考图片和以下4个分镜描述，生成一张完整的4宫格漫画分镜图：
+
+分镜描述：
+1. ${processedDetails[0].description}
+2. ${processedDetails[1].description}
+3. ${processedDetails[2].description}
+4. ${processedDetails[3].description}
+
+要求：
+- 生成一张图片，包含4个清晰的分镜格
+- 采用漫画风格，清晰的线条，鲜明的色彩
+- 每个分镜格要有明显的视觉分隔
+- 保持整体的视觉连贯性和故事性
+- 严格按照4宫格布局排列
+- 采用等比分割，确保每个分镜格大小一致
+- 如果有角色对话内容，请使用中文显示
+- 图片中不要显示任何文本或数字，包括秒数信息`;
+        
+        imageUrl = await generateImageFromRef(
+          gridPrompt,
+          refImage,
+          newNode.data.model,
+          newNode.data.ratio
+        );
+      } else {
+        console.log(`生成4宫格漫画分镜图: 仅使用分镜描述`);
+        // 没有参考图片时直接生成4宫格漫画分镜图 - 图片不显示秒数
+        const gridPrompt = `请基于以下4个分镜描述，生成一张完整的4宫格漫画分镜图：
+
+分镜描述：
+1. ${processedDetails[0].description}
+2. ${processedDetails[1].description}
+3. ${processedDetails[2].description}
+4. ${processedDetails[3].description}
+
+要求：
+- 生成一张图片，包含4个清晰的分镜格
+- 采用漫画风格，清晰的线条，鲜明的色彩
+- 每个分镜格要有明显的视觉分隔
+- 保持整体的视觉连贯性和故事性
+- 严格按照4宫格布局排列
+- 采用等比分割，确保每个分镜格大小一致
+- 如果有角色对话内容，请使用中文显示
+- 图片中不要显示任何文本或数字，包括秒数信息`;
+        
+        imageUrl = await generateImage(
+          gridPrompt,
+          newNode.data.model,
+          newNode.data.ratio
+        );
+      }
+
+      // 更新节点状态 - 生成成功后显示图片
+      handleUpdateWorkflowFixed(
+        prevNodes => prevNodes.map(n => 
+          n.id === newNodeId 
+            ? { 
+                ...n, 
+                data: { 
+                  ...n.data, 
+                  generatedImage: imageUrl,
+                  isGenerating: false,
+                  hidden: false // 生成成功后显示图片
+                } 
+              } 
+            : n
+        ),
+        null
+      );
+      
+      console.log('4宫格漫画分镜图生成完成');
+    } catch (error) {
+      console.error('4宫格漫画分镜图生成失败:', error);
+      // 生成失败时重置生成状态
+      handleUpdateWorkflowFixed(
+        prevNodes => prevNodes.map(n => 
+          n.id === newNodeId 
+            ? { 
+                ...n, 
+                data: { 
+                  ...n.data, 
+                  isGenerating: false 
+                } 
+              } 
+            : n
+        ),
+        null
+      );
+    }
+    
+    // 生成完成后，重置全局模式状态
+    setModeGeneratingState(false);
+    setModeSourceNodeId(null);
+    setCurrentMode('generate');
+  }, [handleUpdateWorkflowFixed, generateImage, generateImageFromRef]);
+
   // API Consumers requiring state update
   const handleTextNodeAnalysis = useCallback(async (script, nodeId, model = "gemini-2.5", rolePrompt = "") => {
     handleUpdateWorkflowFixed(prevNodes => prevNodes.map(n => n.id === nodeId ? { ...n, data: { ...n.data, isAnalyzing: true } } : n));
@@ -2093,6 +2461,27 @@ export default function InfiniteCanvasApp() {
       }
     }
   }, [selectedIds, handleUpdateWorkflowFixed, setShowSaveProjectModal]);
+
+  // 模式生成状态管理
+  const [modeGenerating, setModeGeneratingState] = useState(false);
+  const [modeSourceNodeId, setModeSourceNodeId] = useState(null);
+  const [currentMode, setCurrentMode] = useState('generate'); // generate, storyboard, grid
+
+  // 将函数暴露到全局
+  useEffect(() => {
+    window.topFlow = {
+      createStoryboardNodes,
+      createGridNodes,
+      updateStoryboardPrompts,
+      setModeGenerating: setModeGeneratingState,
+      setModeSourceNode: setModeSourceNodeId,
+      setCurrentMode: setCurrentMode,
+      isModeGenerating: () => modeGenerating,
+      getModeSourceNode: () => modeSourceNodeId,
+      getCurrentMode: () => currentMode
+    };
+  }, [createStoryboardNodes, createGridNodes, updateStoryboardPrompts, modeGenerating, modeSourceNodeId, currentMode]);
+
   useEffect(() => { window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [handleKeyDown]);
 
   if (isLoading) return <div className="flex items-center justify-center h-screen w-full bg-[#f3f4f6] text-gray-500">Loading...</div>;

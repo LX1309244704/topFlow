@@ -5,6 +5,7 @@ import {
   generateStreamText,
   generateImage,
   generateImageFromRef,
+  generateTextWithImage,
   generateTts as generateSpeech,
   generateStructuredSynopsis,
   generateTtsSong as generateSong
@@ -17,6 +18,7 @@ export {
   generateStreamText,
   generateImage,
   generateImageFromRef,
+  generateTextWithImage,
   generateSpeech,
   generateStructuredSynopsis,
   generateSong
@@ -29,6 +31,7 @@ export default {
   generateStreamText,
   generateImage,
   generateImageFromRef,
+  generateTextWithImage,
   generateSpeech,
   generateStructuredSynopsis,
   generateSong

@@ -477,6 +477,88 @@ export const generateGeminiImage = async (prompt, model = 'nano-banana', ratio =
 };
 
 /**
+ * Gemini多模态分析API（支持图片分析的文本生成）
+ * @param {string} prompt - 文本生成提示词
+ * @param {string} refImage - 参考图像的Base64数据
+ * @returns {Promise<string>} 生成的文本
+ */
+export const generateGeminiTextWithImage = async (prompt, refImage) => {
+  console.log('🎨 Gemini多模态分析API调用:', { prompt, hasRefImage: !!refImage });
+  
+  if (!refImage) {
+    console.warn('⚠️ 没有参考图片，切换到普通文本生成模式');
+    return await generateGeminiText(prompt);
+  }
+  
+  try {
+    const endpoint = '/v1beta/models/gemini-2.5-pro:streamGenerateContent';
+    
+    // 移除data:image/...;base64,前缀
+    const base64Image = refImage.split(',')[1] || refImage.replace(/^data:image\/\w+;base64,/, '');
+    
+    // 构建多模态分析请求
+    const requestData = {
+      systemInstruction: {
+        parts: [
+          {
+            text: "你是一个专业的视觉分析师，能够基于参考图片和用户需求，提供专业的视觉分析和创意建议。请仔细分析图片的视觉元素，包括构图、色彩、风格、主体等，并给出专业的建议。"
+          }
+        ]
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [
+            {
+              text: prompt
+            },
+            {
+              inlineData: {
+                mimeType: "image/jpeg",
+                data: base64Image
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        topP: 1,
+        thinkingConfig: {
+          includeThoughts: true,
+          thinkingBudget: 26240
+        }
+      }
+    };
+    
+    console.log('📤 Gemini多模态分析API请求参数:', JSON.stringify({
+      ...requestData,
+      contents: [{
+        ...requestData.contents[0],
+        parts: [
+          requestData.contents[0].parts[0],
+          { inlineData: { mimeType: "image/jpeg", data: "[BASE64_DATA_HIDDEN]" } }
+        ]
+      }]
+    }, null, 2));
+    
+    let fullText = '';
+    fullText = await fetchStreamWithRetry(endpoint, requestData, (text) => {
+      // 实时处理文本片段
+      if (text && text !== undefined && text !== null && text.trim() !== '') {
+        fullText += text;
+      }
+    });
+    
+    return fullText || '分析失败';
+    
+  } catch (error) {
+    console.error("❌ Gemini多模态分析错误:", error);
+    return '分析失败: ' + error.message;
+  }
+};
+
+/**
  * Gemini基于参考图像的图像编辑API
  * @param {string} prompt - 图像编辑提示词
  * @param {string} refImage - 参考图像的Base64数据
