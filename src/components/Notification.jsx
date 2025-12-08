@@ -90,7 +90,7 @@ const useNotification = () => {
   const [notifications, setNotifications] = useState([]);
 
   const addNotification = (notification) => {
-    const id = Date.now().toString();
+    const id = (Date.now() + Math.random()).toString();
     const newNotification = {
       id,
       type: notification.type || NOTIFICATION_TYPES.INFO,

@@ -13,6 +13,7 @@ import { Sidebar } from './components/Sidebar.jsx';
 import { CreationMenu } from './components/TemplateComponents.jsx';
 import { indexedDBManager } from './utils/indexedDB';
 import { NotificationContainer, useNotification } from './components/Notification.jsx';
+import QuickCreatePanel from './components/QuickCreatePanel.jsx';
 
 // 提取视频最后一帧的函数
 const extractLastFrameFromVideo = async (videoUrl) => {
@@ -1523,7 +1524,7 @@ export default function InfiniteCanvasApp() {
           // 如果是内容政策违规错误，显示用户友好的提示
           if (error.message && error.message.includes('内容政策')) {
             addNotification({
-              id: Date.now(),
+              id: Date.now() + Math.random(),
               type: 'error',
               title: '内容政策违规',
               message: '您输入的提示词可能违反了内容政策，请尝试修改提示词或避免使用敏感内容。',
@@ -1984,25 +1985,32 @@ export default function InfiniteCanvasApp() {
   // Helper functions for handlers
   const updateNode = useCallback((id, newData) => handleUpdateWorkflowFixed(ns => ns.map(n => n.id === id ? { ...n, ...newData } : n)), [handleUpdateWorkflowFixed]);
   const deleteNode = useCallback((id) => { handleUpdateWorkflowFixed(ns => ns.filter(n => n.id !== id), es => es.filter(e => e.source !== id && e.target !== id)); setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; }); }, [handleUpdateWorkflowFixed]);
-  const handleAddEpisode = useCallback(() => { const id = Date.now(); setProject(p => ({ ...p, episodes: [...p.episodes, { id, name: `新剧集 ${p.episodes.length + 1}` }], workflows: { ...p.workflows, [id]: { nodes: [], edges: [] } } })); }, []);
+  const handleAddEpisode = useCallback(() => { const id = Date.now() + Math.random(); setProject(p => ({ ...p, episodes: [...p.episodes, { id, name: `新剧集 ${p.episodes.length + 1}` }], workflows: { ...p.workflows, [id]: { nodes: [], edges: [] } } })); }, []);
   const handleDeleteEpisode = useCallback((id) => { setProject(p => { const w = { ...p.workflows }; delete w[id]; const eps = p.episodes.filter(e => e.id !== id); return { ...p, episodes: eps, workflows: w, currentEpisodeId: p.currentEpisodeId === id ? (eps[0]?.id || null) : p.currentEpisodeId }; }); setSelectedIds(new Set()); }, []);
   const handleUpdateEpisodeName = useCallback((id, name) => setProject(p => ({ ...p, episodes: p.episodes.map(e => e.id === id ? { ...e, name } : e) })), []);
   const handleSwitchEpisode = useCallback((id) => { if (id !== currentEpisodeId) { setProject(p => ({ ...p, currentEpisodeId: id })); setSelectedIds(new Set()); setMenu(null); } }, [currentEpisodeId]);
   
   // --- Add Node Function ---
   // Defined BEFORE handleSelectTemplate to ensure scope availability
-  const addNode = useCallback((type, x, y, sourceId) => {
+  const addNode = useCallback((type, x, y, sourceId, customData = null) => {
     const pos = x && y ? { x, y } : { x: (window.innerWidth/2 - offset.x)/scale - 160, y: (window.innerHeight/2 - offset.y)/scale - 100 };
     let initialData = { prompt: "", isGenerating: false };
     if (type === 'image') initialData = { ...initialData, model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 };
     else if (type === 'video') initialData = { ...initialData, model: "sora2", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
     else if (type === 'text') initialData = { text: "", isAnalyzing: false, isWriting: false, height: 200 }; 
+    else if (type === 'audio') initialData = { text: "", audioMode: "speech" }; // 音频节点默认值
     
-    const newNode = { id: Date.now(), type, x: pos.x, y: pos.y, data: initialData };
+    // 如果有自定义数据，则合并到初始数据中
+    if (customData) {
+      initialData = { ...initialData, ...customData };
+    }
+    
+    // 生成唯一ID，添加随机数避免短时间内创建的节点ID冲突
+    const newNode = { id: Date.now() + Math.random(), type, x: pos.x, y: pos.y, data: initialData };
     
     handleUpdateWorkflowFixed(
         prevNodes => [...prevNodes, newNode],
-        prevEdges => sourceId ? [...prevEdges, { id: `${sourceId}-${newNode.id}`, source: sourceId, target: newNode.id }] : prevEdges
+        prevEdges => sourceId ? [...prevEdges, { id: `${sourceId}-${newNode.id}-${Math.random()}`, source: sourceId, target: newNode.id }] : prevEdges
     );
   }, [offset, scale, handleUpdateWorkflowFixed]);
 
@@ -2687,20 +2695,23 @@ export default function InfiniteCanvasApp() {
            </Button>
          </div>
          
-         {/* 画布底部快捷提示 */}
-         <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
-           双击连线删除 • Shift+框选移动
-         </div>
-         
-         {/* 导航图 */}
-         <MiniMap 
-           nodes={nodes} 
-           offset={offset} 
-           scale={scale} 
-           canvasSize={canvasSize}
-           onNavigate={navigateToPosition}
-           visible={showMiniMap}
-         />
+        {/* 画布底部快捷提示 */}
+        <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
+          双击连线删除 • Shift+框选移动
+        </div>
+        
+        {/* 快速创建面板 - 画布中间下方 */}
+        <QuickCreatePanel onAddNode={addNode} generateText={generateText} />
+        
+        {/* 导航图 */}
+        <MiniMap 
+          nodes={nodes} 
+          offset={offset} 
+          scale={scale} 
+          canvasSize={canvasSize}
+          onNavigate={navigateToPosition}
+          visible={showMiniMap}
+        />
       </div>
     </div>
   );
