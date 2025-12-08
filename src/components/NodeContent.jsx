@@ -1,35 +1,14 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, Maximize2, X } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
 import apiClient from '../api/client.js';
 
-// 共用的放大弹窗组件
-const ZoomModal = ({ isOpen, onClose, title, children }) => {
-  if (!isOpen) return null;
-  
-  return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={onClose}>
-      <div className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="absolute top-4 right-4 flex justify-between items-center gap-2">
-          <div className="text-lg font-bold text-gray-800">{title}</div>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-            <X size={20} className="text-gray-600" />
-          </button>
-        </div>
-        <div className="p-4">
-          {children}
-        </div>
-      </div>
-    </div>,
-    document.body
-  );
-};
+
 
 // 共用的媒体操作按钮组件
 const MediaActionButtons = ({ 
-  onZoom, 
   onDownload, 
   onClear, 
   showDownload = true, 
@@ -37,19 +16,28 @@ const MediaActionButtons = ({
   downloadTitle = "下载",
   clearTitle = "清除"
 }) => {
-  if (isDisabled) return null;
-  
   return (
     <div className="flex gap-2">
-      <button onClick={onZoom} className="p-1.5 bg-white/80 hover:bg-white text-blue-600 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="放大查看">
-        <Maximize2 size={14} />
-      </button>
       {showDownload && (
-        <button onClick={onDownload} className="p-1.5 bg-white/80 hover:bg-white text-gray-700 rounded-full shadow-sm backdrop-blur-sm transition-colors" title={downloadTitle}>
+        <button 
+          onClick={isDisabled ? undefined : onDownload} 
+          disabled={isDisabled}
+          className={`p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors ${
+            isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white text-gray-700 cursor-pointer'
+          }`} 
+          title={isDisabled ? "正在生成，请稍候" : downloadTitle}
+        >
           <Download size={14} />
         </button>
       )}
-      <button onClick={onClear} className="p-1.5 bg-white/80 hover:bg-white text-red-500 rounded-full shadow-sm backdrop-blur-sm transition-colors" title={clearTitle}>
+      <button 
+        onClick={isDisabled ? undefined : onClear} 
+        disabled={isDisabled}
+        className={`p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors ${
+          isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white text-red-500 cursor-pointer'
+        }`} 
+        title={isDisabled ? "正在生成，请稍候" : clearTitle}
+      >
         <Trash2 size={14} />
       </button>
     </div>
@@ -847,9 +835,7 @@ ${node.data.prompt}
         </BottomActionBar>
       </div>
 
-      <ZoomModal isOpen={isZoomed} onClose={handleCloseZoom} title="图片预览">
-        <img src={node.data.generatedImage} alt="放大图片" className="w-full h-auto max-h-[80vh] object-contain" />
-      </ZoomModal>
+
     </>
   );
 };
@@ -1208,27 +1194,58 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         {node.data.isGenerating ? (
           <GenerationIndicator text="AI Processing..." />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center group">
-            {node.data.videoUrl ? (
-              <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
-            ) : (
-              node.data.generatedVideo ? 
-                <Play size={48} className="text-blue-600 opacity-80" /> : 
-                <Video size={64} className="text-blue-200/80" />
-            )}
-            {(node.data.videoUrl || node.data.generatedVideo) && !node.data.isGenerating && (
-              <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                <MediaActionButtons 
-                  onZoom={() => handleZoom()}
-                  onDownload={() => handleDownload()}
-                  onClear={() => handleClearVideo()}
-                  showDownload={!!node.data.videoUrl}
-                  downloadTitle="下载视频"
-                  clearTitle="清除视频"
-                />
-              </div>
-            )}
-          </div>
+          <>
+            {/* 视频内容容器，确保不会覆盖按钮 */}
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              {node.data.videoUrl ? (
+                <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
+              ) : (
+                node.data.generatedVideo ? 
+                  <Play size={48} className="text-blue-600 opacity-80" /> : 
+                  <Video size={64} className="text-blue-200/80" />
+              )}
+            </div>
+            {/* 操作按钮容器，始终可见，确保在最上层 */}
+            <div className="absolute bottom-2 right-2 z-50 flex gap-2">
+              {/* 放大按钮 - 始终显示 */}
+              <button 
+                onClick={() => !node.data.isGenerating && handleZoom()} 
+                disabled={node.data.isGenerating}
+                className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                  node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-blue-600 cursor-pointer'
+                }`} 
+                title={node.data.isGenerating ? "正在生成，请稍候" : "放大查看视频"}
+              >
+                <Maximize2 size={14} />
+              </button>
+              
+              {/* 下载按钮 - 只有有视频时才显示 */}
+              {node.data.videoUrl && (
+                <button 
+                  onClick={() => !node.data.isGenerating && handleDownload()} 
+                  disabled={node.data.isGenerating}
+                  className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                    node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-gray-700 cursor-pointer'
+                  }`} 
+                  title={node.data.isGenerating ? "正在生成，请稍候" : "下载视频"}
+                >
+                  <Download size={14} />
+                </button>
+              )}
+              
+              {/* 清除按钮 - 始终显示 */}
+              <button 
+                onClick={() => !node.data.isGenerating && handleClearVideo()} 
+                disabled={node.data.isGenerating}
+                className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                  node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-red-500 cursor-pointer'
+                }`} 
+                title={node.data.isGenerating ? "正在生成，请稍候" : "清除视频"}
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          </>
         )}
       </div>
       <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
@@ -1282,9 +1299,28 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </BottomActionBar>
       </div>
 
-      <ZoomModal isOpen={isZoomed} onClose={handleCloseZoom} title="图片预览">
-        <img src={node.data.generatedImage} alt="放大图片" className="w-full h-auto max-h-[80vh] object-contain" />
-      </ZoomModal>
+      {/* 视频放大预览弹窗 */}
+      {isZoomed && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={handleCloseZoom}>
+          <div className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-4 right-4 flex justify-between items-center gap-2">
+              <div className="text-lg font-bold text-gray-800">视频预览</div>
+              <button onClick={handleCloseZoom} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                <X size={20} className="text-gray-600" />
+              </button>
+            </div>
+            <div className="p-4">
+              {node.data.videoUrl ? (
+                <video src={node.data.videoUrl} controls autoPlay className="w-full h-auto max-h-[80vh] object-contain" />
+              ) : (
+                <div className="w-full h-64 flex items-center justify-center text-gray-500">
+                  暂无视频可预览
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -1513,9 +1549,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </div>
       </div>
 
-      <ZoomModal isOpen={isZoomed} onClose={handleCloseZoom} title="图片预览">
-        <img src={node.data.generatedImage} alt="放大图片" className="w-full h-auto max-h-[80vh] object-contain" />
-      </ZoomModal>
+
     </>
   );
 };
