@@ -182,7 +182,14 @@ const GenerateButton = ({
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
   const modelOptions = [
     { value: "nano-banana", label: "Nano Banana" },
-    { value: "sdxl", label: "SDXL Lightning" },
+    { value: "nano-banana-pro", label: "Nano Banana Pro" },
+  ];
+
+  // 模式选项
+  const modeOptions = [
+    { value: "generate", label: "生成模式" },
+    { value: "storyboard", label: "分镜模式" },
+    { value: "grid", label: "网格模式" },
   ];
 
   const fileRef = useRef(null);
@@ -467,37 +474,64 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       let gridPrompt;
       
       if (node.data.generatedImage) {
-        // 如果有参考图片，使用多模态分析API分析参考图，生成风格一致的分镜描述
-        console.log('开始使用多模态分析API分析参考图片...');
-        
-        // 使用多模态API分析参考图片的视觉特征
-        const imageAnalysisPrompt = `请仔细分析提供的参考图片，提取以下视觉特征：
-1. 艺术风格（如：写实、卡通、动漫、油画、水彩等）
-2. 色彩调性（如：明亮、暗沉、暖色调、冷色调等）
-3. 人物特征（如：外貌、服装、发型、表情等）
-4. 背景环境（如：室内、室外、城市、自然等）
-5. 光照条件（如：自然光、室内灯光、黄昏、夜晚等）
+        // 如果有参考图片，要求AI生成JSON格式的关键帧序列，强调视觉一致性
+        gridPrompt = `请仔细分析参考图片的视觉风格、构图、色调、人物特征等元素，生成的分镜关键帧需要保持与参考图片的视觉一致性。
 
-请返回一个简洁的视觉特征描述，用于后续生成风格一致的漫画分镜。`;
-        
-        // 使用多模态API分析参考图片
-        const visualFeatures = await apiClient.generateTextWithImage(imageAnalysisPrompt, node.data.generatedImage);
-        console.log('参考图片视觉特征分析结果:', visualFeatures);
-        
-        gridPrompt = `基于参考图片的视觉特征，生成4个连贯的漫画分镜描述。
+参考图片描述：${node.data.prompt}
 
-参考图片视觉特征：${visualFeatures}
+请生成一个JSON格式的关键帧序列，每个帧包含：
+1. index - 帧序号
+2. shotType - 镜头类型
+3. timePoint - 时间点
+4. visualDescription - 视觉描述
+5. composition - 构图信息
+6. continuity - 连续性说明
+7. imagePrompt - 图像提示词（需要包含保持与参考图片一致的视觉元素）
 
-重要要求：
-1. 每个分镜描述必须严格保持与参考图片完全相同的视觉风格
-2. 保持相同的人物特征、服装、发型、表情等所有细节
-3. 延续相同的背景环境、光照条件和色彩调性
-4. 按照故事发展顺序：开场-发展-高潮-结局
-5. 每个分镜描述控制在25字以内，适合漫画分镜
-6. 每个分镜标注时长："描述内容 (时长：X秒)"
-7. 直接返回4个描述，每行一个，不要其他内容
+重要提示：图像提示词需要包含明确的视觉一致性要求，如"保持与参考图片相同的艺术风格"、"延续参考图片的色调"、"保持人物特征一致"等。
 
-请确保生成的4个分镜在视觉风格上与参考图片100%一致，包括所有视觉元素。`;
+请严格按照以下JSON格式返回，只返回JSON数据，不包含其他文字：
+
+{
+  "frames": [
+    {
+      "index": 1,
+      "shotType": "开场镜头",
+      "timePoint": "0-3秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    },
+    {
+      "index": 2,
+      "shotType": "动作镜头",
+      "timePoint": "3-6秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    },
+    {
+      "index": 3,
+      "shotType": "反应镜头",
+      "timePoint": "6-9秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    },
+    {
+      "index": 4,
+      "shotType": "结局镜头",
+      "timePoint": "9-12秒",
+      "visualDescription": "视觉描述内容",
+      "composition": "构图信息",
+      "continuity": "连续性说明",
+      "imagePrompt": "图像提示词，包含视觉一致性要求"
+    }
+  ]
+}`;
       } else {
         // 如果没有参考图片，生成4宫格漫画分镜描述
         gridPrompt = `基于以下场景描述，生成4个连续的漫画分镜头画面描述，用于创建一张完整的4宫格漫画分镜图：
@@ -1131,8 +1165,10 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
 // 视频节点内容组件
 export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
   const videoModelOptions = [
-    {value:"sora2",label:"Sora 2.0"}, 
-    {value:"veo_3_1-fast",label:"veo_3_1-fast"}
+    {value:"svd",label:"Stable Video Diffusion"}, 
+    {value:"gen2",label:"Runway Gen-2"}, 
+    {value:"pika",label:"Pika Labs"}, 
+    {value:"luma",label:"Luma Dream Machine"}
   ];
   
   const [isZoomed, setIsZoomed] = useState(false);
@@ -1174,7 +1210,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         ) : (
           <div className="absolute inset-0 flex items-center justify-center group">
             {node.data.videoUrl ? (
-              <video src={node.data.videoUrl} controls muted className="w-full h-full object-cover" />
+              <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
             ) : (
               node.data.generatedVideo ? 
                 <Play size={48} className="text-blue-600 opacity-80" /> : 
@@ -1214,7 +1250,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         />
         
         <div className="flex items-center gap-2 mt-1">
-          <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
+          <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
         
         <BottomActionBar

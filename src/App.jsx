@@ -13,7 +13,6 @@ import { Sidebar } from './components/Sidebar.jsx';
 import { CreationMenu } from './components/TemplateComponents.jsx';
 import { indexedDBManager } from './utils/indexedDB';
 import { NotificationContainer, useNotification } from './components/Notification.jsx';
-import QuickCreatePanel from './components/QuickCreatePanel.jsx';
 
 // 提取视频最后一帧的函数
 const extractLastFrameFromVideo = async (videoUrl) => {
@@ -267,7 +266,7 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
         ) : (
           <div className="absolute inset-0 flex items-center justify-center group">
               {node.data.videoUrl ? (
-                  <video src={node.data.videoUrl} controls muted className="w-full h-full object-cover" />
+                  <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
               ) : (
                    node.data.generatedVideo ? <Play size={48} className="text-blue-600 opacity-80" /> : <Video size={64} className="text-blue-200/80" />
               )}
@@ -1524,7 +1523,7 @@ export default function InfiniteCanvasApp() {
           // 如果是内容政策违规错误，显示用户友好的提示
           if (error.message && error.message.includes('内容政策')) {
             addNotification({
-              id: Date.now() + Math.random(),
+              id: Date.now(),
               type: 'error',
               title: '内容政策违规',
               message: '您输入的提示词可能违反了内容政策，请尝试修改提示词或避免使用敏感内容。',
@@ -1841,27 +1840,20 @@ export default function InfiniteCanvasApp() {
       
       if (refImage) {
         console.log(`生成4宫格漫画分镜图: 使用参考图 + 分镜描述`);
-        // 使用参考图生成4宫格漫画分镜图 - 优化提示词确保风格一致性
-        const gridPrompt = `请基于提供的参考图片的视觉风格和内容基调，生成一张完整的4宫格漫画分镜图。
+        // 使用参考图生成4宫格漫画分镜图 - 图片不显示秒数
+        const gridPrompt = `请严格按照参考图片的艺术风格、色彩、人物造型和视觉风格，基于以下4个分镜描述生成一张4宫格漫画分镜图：
 
-参考图片的风格和基调必须严格保持一致。
+${processedDetails[0].description}
+${processedDetails[1].description}
+${processedDetails[2].description}
+${processedDetails[3].description}
 
-分镜描述：
-1. ${processedDetails[0].description}
-2. ${processedDetails[1].description}
-3. ${processedDetails[2].description}
-4. ${processedDetails[3].description}
-
-关键要求：
-- 严格保持与参考图片相同的视觉风格：角色设计、色彩调性、光影效果、艺术风格
-- 生成一张图片，包含4个清晰的分镜格，采用标准4宫格布局
-- 每个分镜格要有明显的视觉分隔，但保持整体视觉连贯性
-- 确保人物/角色外观、服装、发型等细节与参考图完全一致
-- 保持相同的背景环境、光照条件和氛围
-- 严格按照参考图的艺术风格（如写实、卡通、动漫、油画等）
-- 采用等比分割，确保每个分镜格大小一致
-- 如果有角色对话内容，请使用中文显示
-- 图片中不要显示任何文本或数字，包括秒数信息`;
+要求：
+- 严格保持参考图的视觉风格和艺术特色
+- 生成4宫格漫画分镜图，每个分镜格大小一致
+- 保持人物角色、场景风格与参考图完全一致
+- 确保4个分镜在视觉上连贯统一
+- 图片中不要显示任何文本或数字`;
         
         imageUrl = await generateImageFromRef(
           gridPrompt,
@@ -1872,23 +1864,18 @@ export default function InfiniteCanvasApp() {
       } else {
         console.log(`生成4宫格漫画分镜图: 仅使用分镜描述`);
         // 没有参考图片时直接生成4宫格漫画分镜图 - 图片不显示秒数
-        const gridPrompt = `请基于以下4个分镜描述，生成一张完整的4宫格漫画分镜图：
+        const gridPrompt = `请基于以下4个分镜描述生成一张4宫格漫画分镜图，确保4个分镜在艺术风格、人物造型和视觉风格上保持一致：
 
-分镜描述：
-1. ${processedDetails[0].description}
-2. ${processedDetails[1].description}
-3. ${processedDetails[2].description}
-4. ${processedDetails[3].description}
+${processedDetails[0].description}
+${processedDetails[1].description}
+${processedDetails[2].description}
+${processedDetails[3].description}
 
 要求：
-- 生成一张图片，包含4个清晰的分镜格
-- 采用漫画风格，清晰的线条，鲜明的色彩
-- 每个分镜格要有明显的视觉分隔
-- 保持整体的视觉连贯性和故事性
-- 严格按照4宫格布局排列
-- 采用等比分割，确保每个分镜格大小一致
-- 如果有角色对话内容，请使用中文显示
-- 图片中不要显示任何文本或数字，包括秒数信息`;
+- 生成4宫格漫画分镜图，每个分镜格大小一致
+- 保持统一的漫画风格、色彩和人物造型
+- 确保4个分镜在视觉上连贯统一
+- 图片中不要显示任何文本或数字`;
         
         imageUrl = await generateImage(
           gridPrompt,
@@ -1985,32 +1972,25 @@ export default function InfiniteCanvasApp() {
   // Helper functions for handlers
   const updateNode = useCallback((id, newData) => handleUpdateWorkflowFixed(ns => ns.map(n => n.id === id ? { ...n, ...newData } : n)), [handleUpdateWorkflowFixed]);
   const deleteNode = useCallback((id) => { handleUpdateWorkflowFixed(ns => ns.filter(n => n.id !== id), es => es.filter(e => e.source !== id && e.target !== id)); setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; }); }, [handleUpdateWorkflowFixed]);
-  const handleAddEpisode = useCallback(() => { const id = Date.now() + Math.random(); setProject(p => ({ ...p, episodes: [...p.episodes, { id, name: `新剧集 ${p.episodes.length + 1}` }], workflows: { ...p.workflows, [id]: { nodes: [], edges: [] } } })); }, []);
+  const handleAddEpisode = useCallback(() => { const id = Date.now(); setProject(p => ({ ...p, episodes: [...p.episodes, { id, name: `新剧集 ${p.episodes.length + 1}` }], workflows: { ...p.workflows, [id]: { nodes: [], edges: [] } } })); }, []);
   const handleDeleteEpisode = useCallback((id) => { setProject(p => { const w = { ...p.workflows }; delete w[id]; const eps = p.episodes.filter(e => e.id !== id); return { ...p, episodes: eps, workflows: w, currentEpisodeId: p.currentEpisodeId === id ? (eps[0]?.id || null) : p.currentEpisodeId }; }); setSelectedIds(new Set()); }, []);
   const handleUpdateEpisodeName = useCallback((id, name) => setProject(p => ({ ...p, episodes: p.episodes.map(e => e.id === id ? { ...e, name } : e) })), []);
   const handleSwitchEpisode = useCallback((id) => { if (id !== currentEpisodeId) { setProject(p => ({ ...p, currentEpisodeId: id })); setSelectedIds(new Set()); setMenu(null); } }, [currentEpisodeId]);
   
   // --- Add Node Function ---
   // Defined BEFORE handleSelectTemplate to ensure scope availability
-  const addNode = useCallback((type, x, y, sourceId, customData = null) => {
+  const addNode = useCallback((type, x, y, sourceId) => {
     const pos = x && y ? { x, y } : { x: (window.innerWidth/2 - offset.x)/scale - 160, y: (window.innerHeight/2 - offset.y)/scale - 100 };
     let initialData = { prompt: "", isGenerating: false };
     if (type === 'image') initialData = { ...initialData, model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 };
     else if (type === 'video') initialData = { ...initialData, model: "sora2", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
     else if (type === 'text') initialData = { text: "", isAnalyzing: false, isWriting: false, height: 200 }; 
-    else if (type === 'audio') initialData = { text: "", audioMode: "speech" }; // 音频节点默认值
     
-    // 如果有自定义数据，则合并到初始数据中
-    if (customData) {
-      initialData = { ...initialData, ...customData };
-    }
-    
-    // 生成唯一ID，添加随机数避免短时间内创建的节点ID冲突
-    const newNode = { id: Date.now() + Math.random(), type, x: pos.x, y: pos.y, data: initialData };
+    const newNode = { id: Date.now(), type, x: pos.x, y: pos.y, data: initialData };
     
     handleUpdateWorkflowFixed(
         prevNodes => [...prevNodes, newNode],
-        prevEdges => sourceId ? [...prevEdges, { id: `${sourceId}-${newNode.id}-${Math.random()}`, source: sourceId, target: newNode.id }] : prevEdges
+        prevEdges => sourceId ? [...prevEdges, { id: `${sourceId}-${newNode.id}`, source: sourceId, target: newNode.id }] : prevEdges
     );
   }, [offset, scale, handleUpdateWorkflowFixed]);
 
@@ -2695,23 +2675,20 @@ export default function InfiniteCanvasApp() {
            </Button>
          </div>
          
-        {/* 画布底部快捷提示 */}
-        <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
-          双击连线删除 • Shift+框选移动
-        </div>
-        
-        {/* 快速创建面板 - 画布中间下方 */}
-        <QuickCreatePanel onAddNode={addNode} generateText={generateText} />
-        
-        {/* 导航图 */}
-        <MiniMap 
-          nodes={nodes} 
-          offset={offset} 
-          scale={scale} 
-          canvasSize={canvasSize}
-          onNavigate={navigateToPosition}
-          visible={showMiniMap}
-        />
+         {/* 画布底部快捷提示 */}
+         <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
+           双击连线删除 • Shift+框选移动
+         </div>
+         
+         {/* 导航图 */}
+         <MiniMap 
+           nodes={nodes} 
+           offset={offset} 
+           scale={scale} 
+           canvasSize={canvasSize}
+           onNavigate={navigateToPosition}
+           visible={showMiniMap}
+         />
       </div>
     </div>
   );
