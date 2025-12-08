@@ -532,7 +532,7 @@ const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputL
         ) : (
           <div className="absolute inset-0 flex items-center justify-center group">
               {node.data.videoUrl ? (
-                  <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
+                  <video src={node.data.videoUrl} controls muted className="w-full h-full object-cover" />
               ) : (
                    node.data.generatedVideo ? <Play size={48} className="text-blue-600 opacity-80" /> : <Video size={64} className="text-blue-200/80" />
               )}
