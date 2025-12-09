@@ -2514,6 +2514,12 @@ ${processedDetails[3].description}
   const handleKeyDown = useCallback((e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
     
+    // 阻止浏览器的默认缩放行为 (Ctrl+加号/减号)
+    if ((e.ctrlKey || e.metaKey) && (e.key === '+' || e.key === '-' || e.key === '=')) {
+      e.preventDefault();
+      return;
+    }
+    
     // Ctrl+S 保存项目
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
@@ -2555,6 +2561,40 @@ ${processedDetails[3].description}
   }, [createStoryboardNodes, createGridNodes, updateStoryboardPrompts, modeGenerating, modeSourceNodeId, currentMode]);
 
   useEffect(() => { window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [handleKeyDown]);
+
+  // 全局阻止浏览器默认缩放行为
+  useEffect(() => {
+    const handleWheel = (e) => {
+      // 如果在画布区域内，并且按住Ctrl键，阻止浏览器默认缩放
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+    
+    // 捕获阶段阻止，确保在浏览器处理之前拦截
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    
+    return () => {
+      window.removeEventListener('wheel', handleWheel, { capture: true });
+    };
+  }, []);
+
+  // 全局阻止浏览器默认缩放行为
+  useEffect(() => {
+    const handleWheel = (e) => {
+      // 如果在画布区域内，并且按住Ctrl键，阻止浏览器默认缩放
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+    
+    // 捕获阶段阻止，确保在浏览器处理之前拦截
+    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
+    
+    return () => {
+      window.removeEventListener('wheel', handleWheel, { capture: true });
+    };
+  }, []);
 
   if (isLoading) return <div className="flex items-center justify-center h-screen w-full bg-[#f3f4f6] text-gray-500">Loading...</div>;
 
@@ -2638,7 +2678,21 @@ ${processedDetails[3].description}
         </div>
       )}
       
-      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={(e) => { if (e.cancelable) { e.preventDefault(); } setOffset(p => ({ x: p.x, y: p.y - e.deltaY })); }} tabIndex={0}>
+      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={(e) => { 
+        // 阻止浏览器默认缩放行为
+        if (e.ctrlKey || e.cancelable) { 
+          e.preventDefault(); 
+        }
+        
+        if (e.ctrlKey) {
+          // Ctrl+滚轮缩放画布
+          const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+          setScale(s => Math.max(0.1, Math.min(3, s * zoomFactor)));
+        } else {
+          // 普通滚轮滚动画布
+          setOffset(p => ({ x: p.x, y: p.y - e.deltaY }));
+        }
+      }} tabIndex={0}>
          <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#d1d5db 1.5px, transparent 1.5px)', opacity: 0.6 }} />
          <div className="absolute inset-0 origin-top-left will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
             <svg className="absolute inset-0 overflow-visible pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
@@ -2659,6 +2713,34 @@ ${processedDetails[3].description}
          {dragState?.type === 'select' && <div style={{ position: 'fixed', left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', zIndex: 9999, pointerEvents: 'none' }} />}
         <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto flex flex-col gap-2">
          <Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button>
+         
+         {/* 画布缩放控制 */}
+         <div className="bg-white rounded-lg shadow-lg border border-gray-300 p-2 flex items-center gap-2">
+           <button 
+             onClick={() => setScale(s => Math.max(0.1, s - 0.1))}
+             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600"
+             title="缩小"
+           >
+             <Minus size={16} />
+           </button>
+           <span className="text-sm font-medium text-gray-700 min-w-[40px] text-center">
+             {Math.round(scale * 100)}%
+           </span>
+           <button 
+             onClick={() => setScale(s => Math.min(3, s + 0.1))}
+             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600"
+             title="放大"
+           >
+             <Plus size={16} />
+           </button>
+           <button 
+             onClick={() => setScale(1)}
+             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600 text-xs"
+             title="重置到100%"
+           >
+             100%
+           </button>
+         </div>
         </div>
          <div className="absolute bottom-6 right-4 z-[100] pointer-events-auto flex gap-2">
            <Button 
@@ -2688,7 +2770,7 @@ ${processedDetails[3].description}
          
          {/* 画布底部快捷提示 */}
          <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
-           双击连线删除 • Shift+框选移动
+           双击连线删除 • Shift+框选移动 • Ctrl+滚轮缩放
          </div>
          
          {/* 导航图 */}

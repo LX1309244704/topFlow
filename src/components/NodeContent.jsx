@@ -181,7 +181,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   ];
 
   const fileRef = useRef(null);
-  const [isZoomed, setIsZoomed] = useState(false);
 
   useEffect(() => {
     const generatedImage = node.data.generatedImage;
@@ -229,13 +228,7 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     updateNode(node.id, { data: { ...node.data, generatedImage: null } });
   };
 
-  const handleZoom = () => {
-    setIsZoomed(true);
-  };
 
-  const handleCloseZoom = () => {
-    setIsZoomed(false);
-  };
 
   // 分镜模式处理函数
   const handleStoryboard = async () => {
@@ -769,7 +762,6 @@ ${node.data.prompt}
             <img src={node.data.generatedImage} alt="Gen" className="w-full h-full object-cover select-none" draggable={false} onDragStart={(e) => e.preventDefault()} />
             <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               <MediaActionButtons 
-                onZoom={() => handleZoom()}
                 onDownload={() => handleDownload()}
                 onClear={() => handleClearImage()}
                 downloadTitle="下载图片"
@@ -1157,7 +1149,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     {value:"luma",label:"Luma Dream Machine"}
   ];
   
-  const [isZoomed, setIsZoomed] = useState(false);
+
   
   const handleEnhance = async () => {
     if (!node.data.prompt) return;
@@ -1176,13 +1168,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false } });
   };
 
-  const handleZoom = () => {
-    setIsZoomed(true);
-  };
 
-  const handleCloseZoom = () => {
-    setIsZoomed(false);
-  };
 
   const imageCount = imageInputs.length;
   let inputStatusText = imageCount === 0 ? '文生视频模式 (T2V)' : imageCount === 1 ? '参考图生视频模式 (I2V)' : `首尾帧生视频模式 (${imageCount} Refs)`;
@@ -1207,18 +1193,6 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             </div>
             {/* 操作按钮容器，始终可见，确保在最上层 */}
             <div className="absolute bottom-2 right-2 z-50 flex gap-2">
-              {/* 放大按钮 - 始终显示 */}
-              <button 
-                onClick={() => !node.data.isGenerating && handleZoom()} 
-                disabled={node.data.isGenerating}
-                className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                  node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-blue-600 cursor-pointer'
-                }`} 
-                title={node.data.isGenerating ? "正在生成，请稍候" : "放大查看视频"}
-              >
-                <Maximize2 size={14} />
-              </button>
-              
               {/* 下载按钮 - 只有有视频时才显示 */}
               {node.data.videoUrl && (
                 <button 
@@ -1299,28 +1273,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </BottomActionBar>
       </div>
 
-      {/* 视频放大预览弹窗 */}
-      {isZoomed && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999]" onClick={handleCloseZoom}>
-          <div className="relative max-w-[90vw] max-h-[90vh] bg-white rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute top-4 right-4 flex justify-between items-center gap-2">
-              <div className="text-lg font-bold text-gray-800">视频预览</div>
-              <button onClick={handleCloseZoom} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                <X size={20} className="text-gray-600" />
-              </button>
-            </div>
-            <div className="p-4">
-              {node.data.videoUrl ? (
-                <video src={node.data.videoUrl} controls autoPlay className="w-full h-auto max-h-[80vh] object-contain" />
-              ) : (
-                <div className="w-full h-64 flex items-center justify-center text-gray-500">
-                  暂无视频可预览
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+
     </>
   );
 };
