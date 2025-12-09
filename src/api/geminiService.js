@@ -82,11 +82,24 @@ const apiRequestWithRetry = async (endpoint, data, method = 'POST', retries = 3,
     } catch (error) {
       lastError = error;
       
-      // 如果是网络错误，进行重试
-      if (i < retries - 1 && (error.message.includes('Failed to fetch') || error.message.includes('请求超时'))) {
+      // 如果是网络错误或速率限制错误，进行重试
+      const isNetworkError = error.message.includes('Failed to fetch') || error.message.includes('请求超时');
+      const isRateLimitError = error.message.includes('429') || 
+                            (error.message.includes('API请求失败') && error.message.includes('429'));
+      
+      if (i < retries - 1 && (isNetworkError || isRateLimitError)) {
         console.warn(`Gemini API请求失败 (${i + 1}/${retries})，${error.message}，正在重试...`);
-        // 指数退避策略
-        const delay = Math.pow(2, i) * 1000;
+        
+        let delay;
+        if (isRateLimitError) {
+          // 速率限制错误，使用更长的指数退避策略
+          delay = Math.min(5000 * Math.pow(2, i), 30000); // 5秒, 10秒, 20秒，最多30秒
+          console.warn(`检测到速率限制错误，使用长延迟策略，等待 ${delay}ms`);
+        } else {
+          // 网络错误，使用常规指数退避策略
+          delay = Math.pow(2, i) * 1000;
+        }
+        
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         // 其他错误直接抛出
@@ -625,21 +638,39 @@ export const generateGeminiImageFromRef = async (prompt, refImage, model = 'nano
       return `data:image/png;base64,${response}`;
     }
     
-    // Google Gemini API返回的编辑后图片数据
-    const imagePart = response?.candidates?.[0]?.content?.parts?.find(part => part.inlineData);
-    if (imagePart && imagePart.inlineData?.data) {
-      return `data:image/png;base64,${imagePart.inlineData.data}`;
+    // 检查是否有candidates数组，并且是否为空
+    if (response && response.candidates && Array.isArray(response.candidates)) {
+      if (response.candidates.length === 0) {
+        console.error('❌ Gemini API返回空candidates数组 (request id: ' + (response.requestId || '未知') + ')');
+        throw new Error('received empty response from Gemini: no meaningful content in candidates');
+      }
+      
+      // Google Gemini API返回的编辑后图片数据
+      const imagePart = response.candidates[0]?.content?.parts?.find(part => part.inlineData);
+      if (imagePart && imagePart.inlineData?.data && imagePart.inlineData.data.length > 0) {
+        return `data:image/png;base64,${imagePart.inlineData.data}`;
+      }
+      
+      // 检查candidates[0]中是否有其他格式的图片数据
+      const possibleDataFields = ['data', 'image_data', 'base64_image', 'image'];
+      for (const field of possibleDataFields) {
+        if (response.candidates[0][field] && typeof response.candidates[0][field] === 'string' && response.candidates[0][field].length > 0) {
+          return `data:image/png;base64,${response.candidates[0][field]}`;
+        }
+      }
     }
     
     // 检查其他可能的响应结构
     const possibleDataFields = ['data', 'image_data', 'base64_image', 'image'];
     for (const field of possibleDataFields) {
-      if (response[field] && typeof response[field] === 'string') {
+      if (response[field] && typeof response[field] === 'string' && response[field].length > 0) {
         return `data:image/png;base64,${response[field]}`;
       }
     }
     
-    return createPlaceholderImage(prompt, ratio);
+    // 记录响应结构以便调试
+    console.error('❌ Gemini API未返回有效的图片数据，响应结构:', JSON.stringify(response, null, 2));
+    throw new Error('received empty response from Gemini: no meaningful content in candidates');
     
   } catch (error) {
     console.error("❌ Gemini参考图生成错误:", error);

@@ -236,8 +236,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        console.log(`分镜生成尝试 ${attempt}/${maxRetries}`);
-        
         // 如果有参考图片，使用多模态分析API；否则使用普通文本生成API
         let response;
         if (hasReferenceImage) {
@@ -247,8 +245,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           // 没有参考图片时使用普通文本生成API
           response = await generateText(storyboardPrompt);
         }
-        
-        console.log(`尝试 ${attempt}: AI返回的分镜描述:`, response);
         
         // 处理返回的分镜描述
         let scenes = [];
@@ -270,30 +266,22 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             }
           }
           
-          console.log(`尝试 ${attempt}: 尝试解析的JSON内容:`, cleanResponse);
-          
           const jsonData = JSON.parse(cleanResponse);
           
           // 支持多种JSON格式
           if (jsonData && jsonData.keyframes && Array.isArray(jsonData.keyframes)) {
             // 使用新的keyframes格式的数据
             scenes = jsonData.keyframes.map(frame => frame.image_prompt);
-            console.log(`尝试 ${attempt}: JSON格式分镜数据 (keyframes):`, jsonData.keyframes);
           } else if (jsonData && jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
             // 使用keyframe_sequence格式的数据
             scenes = jsonData.keyframe_sequence.map(frame => frame.description);
-            console.log(`尝试 ${attempt}: JSON格式分镜数据 (keyframe_sequence):`, jsonData.keyframe_sequence);
           } else if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
             // 使用frames格式的数据
             scenes = jsonData.frames.map(frame => frame.imagePrompt || frame.description);
-            console.log(`尝试 ${attempt}: JSON格式分镜数据 (frames):`, jsonData.frames);
           } else {
             throw new Error('Invalid JSON format - no valid array found');
           }
         } catch (error) {
-          // 如果不是JSON格式，使用智能文本处理方式
-          console.log(`尝试 ${attempt}: JSON解析失败，使用智能文本处理方式:`, error.message);
-          
           // 提取真正有用的描述性文本
           const lines = response.split('\n')
             .map(s => s.trim())
@@ -315,14 +303,9 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             .slice(0, 4);
           
           scenes = lines;
-          console.log(`尝试 ${attempt}: 智能处理后的分镜描述:`, scenes);
         }
-
-        console.log(`尝试 ${attempt}: 处理后的分镜描述:`, scenes);
-
         // 检查是否成功获取了有效的分镜描述
         if (scenes.length >= 2) { // 至少需要2个有效的分镜描述
-          console.log(`尝试 ${attempt}: 成功获取分镜描述，返回场景`);
           return { success: true, scenes, response };
         } else {
           throw new Error(`获取的分镜描述数量不足: ${scenes.length}/4`);
@@ -361,7 +344,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         // 调用API生成分镜图片
         const result = await apiClient.generateImage(prompt, hasReferenceImage ? referenceImage : null);
         
-        console.log(`尝试 ${attempt}: 分镜图片生成成功，节点ID: ${nodeId}`);
         return { success: true, image: result, nodeId };
       } catch (error) {
         lastError = error;
@@ -371,14 +353,11 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         if (attempt < maxRetries) {
           // 根据尝试次数增加等待时间
           const waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
-          console.log(`分镜图片生成等待 ${waitTime}ms 后重试...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
     }
-    
-    // 所有尝试都失败了
-    console.error(`分镜图片所有 ${maxRetries} 次尝试都失败了，节点ID: ${nodeId}`);
+
     return { 
       success: false, 
       error: lastError,
@@ -602,8 +581,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
 每个关键帧的image_prompt必须极为详细，包含主体、环境、光线、构图、氛围等所有视觉要素，确保AI能够生成高质量的电影感图像。`;
       }
-
-      console.log('生成分镜提示词，有参考图片:', !!node.data.generatedImage);
       
       // 使用重试机制生成分镜
       const result = await generateStoryboardWithRetry(storyboardPrompt, !!node.data.generatedImage);
@@ -633,11 +610,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
       // 创建分镜节点并生成图片
       if (window.topFlow && window.topFlow.createStoryboardNodes) {
-        if (result.success) {
-          console.log('开始创建分镜节点，使用AI生成的提示词');
-        } else {
-          console.log(`分镜生成失败，使用默认分镜描述。错误: ${result.error?.message}`);
-        }
         await window.topFlow.createStoryboardNodes(node, scenes, node.data.generatedImage);
       }
       
@@ -658,7 +630,6 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       ];
 
       if (window.topFlow && window.topFlow.createStoryboardNodes) {
-        console.log('使用默认分镜描述创建节点');
         await window.topFlow.createStoryboardNodes(node, defaultScenes, node.data.generatedImage);
       }
     } finally {
@@ -684,8 +655,8 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
 参考图片描述：${node.data.prompt}
 
-请生成一个JSON格式的关键帧序列，每个帧包含：
-1. index - 帧序号
+请生成一个JSON格式的关键帧序列，必须包含4个完整分镜，每个帧包含：
+1. index - 帧序号（1-4）
 2. shotType - 镜头类型
 3. timePoint - 时间点
 4. visualDescription - 视觉描述
@@ -695,7 +666,7 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
 重要提示：图像提示词需要包含明确的视觉一致性要求，如"保持与参考图片相同的艺术风格"、"延续参考图片的色调"、"保持人物特征一致"等。
 
-请严格按照以下JSON格式返回，只返回JSON数据，不包含其他文字：
+必须包含4个分镜，不能少！请严格按照以下JSON格式返回，只返回JSON数据，不包含其他文字：
 
 {
   "frames": [
@@ -739,31 +710,33 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 }`;
       } else {
         // 如果没有参考图片，生成4宫格漫画分镜描述
-        gridPrompt = `基于以下场景描述，生成4个连续的漫画分镜头画面描述，用于创建一张完整的4宫格漫画分镜图：
+        gridPrompt = `基于以下场景描述，生成4个连续的漫画分镜头画面描述，用于创建一张标准的4宫格漫画分镜图：
 
 ${node.data.prompt}
 
-要求：
-1. 采用漫画分镜的典型构图方式
-2. 每个描述控制在30字以内，适合AI图像生成
-3. 保持画面连贯性和故事性
-4. 每个分镜需要标注时长（秒数），格式："描述内容 (时长：X秒)"
-5. 直接返回4个描述，每行一个
-6. 确保描述适合生成一张包含4个分镜格的完整图片
-7. 如果有角色对话内容，请使用中文显示
+严格要求：
+1. 必须生成4个分镜，不能多不能少
+2. 采用漫画分镜的典型构图方式
+3. 每个描述控制在30字以内，适合AI图像生成
+4. 保持画面连贯性和故事性
+5. 每个分镜需要标注时长（秒数），格式："描述内容 (时长：X秒)"
+6. 直接返回4个描述，每行一个
+7. 确保描述适合生成一张包含4个分镜格的完整图片
+8. 如果有角色对话内容，请使用中文显示
 
-漫画分镜顺序：
-- 镜头1：开场镜头，建立场景和氛围 (时长：3-5秒)
-- 镜头2：主体动作或中文对话镜头 (时长：4-6秒)
-- 镜头3：反应镜头或细节特写 (时长：2-4秒)
-- 镜头4：结局或高潮镜头 (时长：3-5秒)
+漫画分镜顺序（必须是4个）：
+- 分镜1：开场镜头，建立场景和氛围 (时长：3-5秒)
+- 分镜2：主体动作或中文对话镜头 (时长：4-6秒)
+- 分镜3：反应镜头或细节特写 (时长：2-4秒)
+- 分镜4：结局或高潮镜头 (时长：3-5秒)
 
-请确保描述适合漫画风格的图像生成，所有对话内容使用中文，每个分镜都包含时长信息：`;
+重要强调：
+- 必须提供4个分镜，不是3个或5个
+- 确保描述适合漫画风格的图像生成，所有对话内容使用中文，每个分镜都包含时长信息
+- 每个分镜将对应4宫格中的一个格子，布局为2×2网格`;
       }
 
-      console.log('开始生成4宫格漫画分镜描述，有参考图片:', !!node.data.generatedImage);
       const response = await generateText(gridPrompt);
-      console.log('AI返回的网格分镜描述:', response);
       
       // 处理返回的数据 - 尝试解析JSON格式
       let scenes = [];
@@ -786,29 +759,78 @@ ${node.data.prompt}
           }
         }
         
-        console.log('尝试解析的网格JSON内容:', cleanResponse);
+        // 额外的错误处理：确保cleanResponse是有效的JSON字符串
+        if (!cleanResponse || !cleanResponse.trim()) {
+          throw new Error('Empty response after cleaning');
+        }
+        
+        // 修复可能不完整的JSON格式
+        cleanResponse = cleanResponse
+          .replace(/,\s*}/g, '}') // 移除对象末尾的逗号
+          .replace(/,\s*]/g, ']') // 移除数组末尾的逗号
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":'); // 确保所有键都有引号
         
         jsonData = JSON.parse(cleanResponse);
         
         // 支持多种JSON格式
         if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
           // 使用frames格式的数据
-          scenes = jsonData.frames.map(frame => `${frame.imagePrompt || frame.description} (时长：${frame.timePoint || '3-5秒'})`);
-          console.log('JSON格式网格分镜数据 (frames):', jsonData.frames);
-          isJsonFormat = true;
+          const validFrames = jsonData.frames.filter(frame => frame && (
+            frame.imagePrompt || frame.description || frame.visualDescription
+          ));
+          
+          if (validFrames.length >= 4) {
+            scenes = validFrames.map(frame => {
+              const prompt = frame.imagePrompt || frame.description || frame.visualDescription;
+              const timeInfo = frame.timePoint || frame.duration || '3-5秒';
+              const cleanTimeInfo = timeInfo.toString().includes('秒') ? timeInfo : `${timeInfo}秒`;
+              return `${prompt} (时长：${cleanTimeInfo})`;
+            });
+            isJsonFormat = true;
+          } else {
+            console.warn('frames数组中的有效分镜不足4个:', validFrames.length);
+            throw new Error(`Invalid frames count: ${validFrames.length}/4`);
+          }
         } else if (jsonData && jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
           // 使用keyframe_sequence格式的数据
-          scenes = jsonData.keyframe_sequence.map(frame => `${frame.description} (时长：${frame.timestamp || '3-5秒'})`);
-          console.log('JSON格式网格分镜数据 (keyframe_sequence):', jsonData.keyframe_sequence);
-          isJsonFormat = true;
+          const validKeyframes = jsonData.keyframe_sequence.filter(kf => kf && (
+            kf.description || kf.image_prompt || kf.prompt
+          ));
+          
+          if (validKeyframes.length >= 4) {
+            scenes = validKeyframes.map(keyframe => {
+              const prompt = keyframe.description || keyframe.image_prompt || keyframe.prompt;
+              const timeInfo = keyframe.timestamp || keyframe.duration || '3-5秒';
+              const cleanTimeInfo = timeInfo.toString().includes('秒') ? timeInfo : `${timeInfo}秒`;
+              return `${prompt} (时长：${cleanTimeInfo})`;
+            });
+            isJsonFormat = true;
+          } else {
+            throw new Error(`Invalid keyframe count: ${validKeyframes.length}/4`);
+          }
+        } else if (jsonData && jsonData.keyframes && Array.isArray(jsonData.keyframes)) {
+          // 使用keyframes格式的数据
+          const validKeyframes = jsonData.keyframes.filter(kf => kf && (
+            kf.imagePrompt || kf.description || kf.prompt
+          ));
+          
+          if (validKeyframes.length >= 4) {
+            scenes = validKeyframes.map(keyframe => {
+              const prompt = keyframe.imagePrompt || keyframe.description || keyframe.prompt;
+              const timeInfo = keyframe.duration || keyframe.timePoint || '3-5秒';
+              const cleanTimeInfo = timeInfo.toString().includes('秒') ? timeInfo : `${timeInfo}秒`;
+              return `${prompt} (时长：${cleanTimeInfo})`;
+            });
+            isJsonFormat = true;
+          } else {
+            throw new Error(`Invalid keyframe count: ${validKeyframes.length}/4`);
+          }
         } else {
           throw new Error('Invalid JSON format - no valid array found');
         }
       } catch (error) {
-        // 如果不是JSON格式，使用智能文本处理方式
-        console.log('网格JSON解析失败，使用智能文本处理方式:', error.message);
-        
-        // 提取真正有用的描述性文本
+
+        // 提取真正有用的描述性文本 - 改进的提取方式，确保能正确提取4个分镜
         const lines = response.split('\n')
           .map(s => s.trim())
           .filter(s => {
@@ -826,15 +848,63 @@ ${node.data.prompt}
                    !s.includes('专业') &&
                    !s.includes('基于') &&
                    !s.includes('漫画分镜顺序');
-          })
-          .slice(0, 4);
+          });
         
-        scenes = lines;
-        console.log('智能处理后的网格分镜描述:', scenes);
+        // 特殊处理：如果过滤后少于4行，尝试从JSON字符串中提取imagePrompt
+        if (lines.length < 4) {
+          // 尝试多种方式提取imagePrompt字段
+          const extractPrompts = (pattern) => {
+            const matches = response.match(new RegExp(pattern, 'g'));
+            if (matches && matches.length >= 4) {
+              return matches.map(match => match.replace(/^"imagePrompt":\s*"?|"?$/g, '').trim());
+            }
+            return null;
+          };
+          
+          // 尝试不同的匹配模式
+          const prompts = extractPrompts('"imagePrompt":\\s*"([^"]*)"') ||
+                         extractPrompts('"imagePrompt":\\s*\'([^\']*)\'') ||
+                         extractPrompts('"imagePrompt":\\s*([^,}]+)');
+          
+          if (prompts && prompts.length >= 4) {
+            scenes = prompts.map(prompt => `${prompt} (时长：3-5秒)`);
+          } else {           
+            // 智能分割响应文本，确保有4个分镜
+            const paragraphs = response.split('\n\n').filter(p => p.trim().length > 0);
+            
+            if (paragraphs.length >= 4) {
+              scenes = paragraphs.slice(0, 4).map(p => `${p.trim()} (时长：3-5秒)`);
+            } else {
+              // 按句子分割
+              const sentences = response.split(/[。！？.!?]/).filter(s => s.trim().length > 10);
+              if (sentences.length >= 4) {
+                scenes = sentences.slice(0, 4).map(s => `${s.trim()} (时长：3-5秒)`);
+              } else {
+                // 最后的备用方案：按字符长度均匀分割
+                const chunkSize = Math.max(Math.floor(response.length / 4), 20);
+                for (let i = 0; i < 4; i++) {
+                  const start = i * chunkSize;
+                  const end = i === 3 ? response.length : Math.min((i + 1) * chunkSize, response.length);
+                  const chunk = response.substring(start, end).trim();
+                  if (chunk.length > 0) {
+                    scenes.push(`${chunk} (时长：3-5秒)`);
+                  }
+                }
+              }
+            }
+          }
+        } else {
+          // 过滤后的行足够，添加时长信息
+          scenes = lines.slice(0, 4).map(line => {
+            // 如果已经有时长信息，保持不变
+            if (line.includes('时长：')) {
+              return line;
+            }
+            // 否则添加默认时长
+            return `${line} (时长：3-5秒)`;
+          });
+        }
       }
-
-      console.log('处理后的网格分镜描述:', scenes);
-
       if (scenes.length < 4) {
         // 如果AI返回不足4个场景，使用与漫画风格相关的基本分镜
         const comicScenes = node.data.generatedImage ? [
@@ -857,7 +927,6 @@ ${node.data.prompt}
 
       // 创建网格节点
       if (window.topFlow && window.topFlow.createGridNodes) {
-        console.log('开始创建4宫格漫画分镜图，场景数量:', scenes.length);
         await window.topFlow.createGridNodes(node, scenes, node.data.generatedImage, jsonData);
       }
       

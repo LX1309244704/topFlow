@@ -1652,9 +1652,20 @@ export default function InfiniteCanvasApp() {
           
           // 如果不是最后一次尝试，等待一段时间再重试
           if (attempt < maxRetries) {
-            // 根据尝试次数增加等待时间
-            const waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
-            console.log(`分镜图片生成等待 ${waitTime}ms 后重试 (节点 ${node.id})...`);
+            // 对于429错误（速率限制），需要更长的等待时间
+            const isRateLimitError = error.message && error.message.includes('429');
+            let waitTime;
+            
+            if (isRateLimitError) {
+              // 速率限制错误，使用指数退避策略，等待更长时间
+              waitTime = Math.min(5000 * Math.pow(2, attempt - 1), 30000); // 5秒, 10秒, 20秒，最多30秒
+              console.log(`分镜图片生成遇到速率限制，等待 ${waitTime}ms 后重试 (节点 ${node.id})...`);
+            } else {
+              // 其他错误，使用常规等待时间
+              waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
+              console.log(`分镜图片生成等待 ${waitTime}ms 后重试 (节点 ${node.id})...`);
+            }
+            
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
         }
@@ -1783,18 +1794,108 @@ export default function InfiniteCanvasApp() {
     // 处理分镜描述，提取秒数信息
     let processedDetails = [];
     
-    if (jsonData && jsonData.frames) {
-      // 使用JSON格式的数据
-      processedDetails = jsonData.frames.map(frame => ({
-        description: frame.imagePrompt,
-        duration: parseInt(frame.timePoint.split('-')[1].replace('秒', '')) || 3,
-        shotType: frame.shotType,
-        visualDescription: frame.visualDescription,
-        composition: frame.composition,
-        continuity: frame.continuity
-      }));
-    } else {
-      // 使用旧的文本格式数据
+    if (jsonData) {
+      // 尝试多种JSON格式
+      if (jsonData.frames && Array.isArray(jsonData.frames)) {
+        // 使用frames格式的数据
+        processedDetails = jsonData.frames.map(frame => {
+          const description = frame.imagePrompt || frame.description || frame.visualDescription || '';
+          let duration = 3; // 默认3秒
+          
+          // 尝试从timePoint提取秒数
+          if (frame.timePoint) {
+            const timeMatch = frame.timePoint.match(/([0-9]+)秒/);
+            if (timeMatch) {
+              duration = parseInt(timeMatch[1]);
+            } else {
+              const rangeMatch = frame.timePoint.match(/([0-9]+)-([0-9]+)秒/);
+              if (rangeMatch) {
+                duration = parseInt(rangeMatch[2]);
+              }
+            }
+          } else if (frame.duration) {
+            duration = parseInt(frame.duration) || 3;
+          }
+          
+          return {
+            description: description,
+            duration: duration,
+            shotType: frame.shotType || '',
+            visualDescription: frame.visualDescription || description,
+            composition: frame.composition || '',
+            continuity: frame.continuity || ''
+          };
+        });
+      } else if (jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
+        // 使用keyframe_sequence格式的数据
+        processedDetails = jsonData.keyframe_sequence.map(keyframe => {
+          const description = keyframe.description || keyframe.image_prompt || keyframe.prompt || '';
+          let duration = 3; // 默认3秒
+          
+          // 尝试从timestamp提取秒数
+          if (keyframe.timestamp) {
+            const timeMatch = keyframe.timestamp.match(/([0-9]+)秒/);
+            if (timeMatch) {
+              duration = parseInt(timeMatch[1]);
+            } else {
+              const rangeMatch = keyframe.timestamp.match(/([0-9]+)-([0-9]+)秒/);
+              if (rangeMatch) {
+                duration = parseInt(rangeMatch[2]);
+              }
+            }
+          } else if (keyframe.duration) {
+            duration = parseInt(keyframe.duration) || 3;
+          }
+          
+          return {
+            description: description,
+            duration: duration,
+            shotType: keyframe.shot_type || keyframe.shotType || '',
+            visualDescription: keyframe.visual_description || description,
+            composition: keyframe.composition || '',
+            continuity: keyframe.continuity || ''
+          };
+        });
+      } else if (jsonData.keyframes && Array.isArray(jsonData.keyframes)) {
+        // 使用keyframes格式的数据
+        processedDetails = jsonData.keyframes.map(keyframe => {
+          const description = keyframe.imagePrompt || keyframe.description || keyframe.prompt || '';
+          let duration = 3; // 默认3秒
+          
+          // 尝试从duration或timePoint提取秒数
+          if (keyframe.duration) {
+            const timeMatch = keyframe.duration.match(/([0-9]+)秒/);
+            if (timeMatch) {
+              duration = parseInt(timeMatch[1]);
+            } else {
+              duration = parseInt(keyframe.duration) || 3;
+            }
+          } else if (keyframe.timePoint) {
+            const timeMatch = keyframe.timePoint.match(/([0-9]+)秒/);
+            if (timeMatch) {
+              duration = parseInt(timeMatch[1]);
+            } else {
+              const rangeMatch = keyframe.timePoint.match(/([0-9]+)-([0-9]+)秒/);
+              if (rangeMatch) {
+                duration = parseInt(rangeMatch[2]);
+              }
+            }
+          }
+          
+          return {
+            description: description,
+            duration: duration,
+            shotType: keyframe.shotType || '',
+            visualDescription: keyframe.visualDescription || description,
+            composition: keyframe.composition || '',
+            continuity: keyframe.continuity || ''
+          };
+        });
+      }
+    }
+    
+    // 如果没有成功从JSON中提取数据，使用文本格式数据
+    if (processedDetails.length === 0) {
       processedDetails = details.map(scene => {
         // 提取秒数信息，格式："描述内容 (时长：X秒)"
         const timeMatch = scene.match(/\(时长：([0-9]+)秒\)/);
@@ -1808,6 +1909,29 @@ export default function InfiniteCanvasApp() {
           duration: time
         };
       });
+    }
+    
+    // 确保至少有4个分镜
+    if (processedDetails.length < 4) {
+      console.warn(`处理后的分镜数量不足4个 (${processedDetails.length})，使用默认分镜填充`);
+      const defaultDescriptions = [
+        `${referenceImage ? '基于参考图' : ''} 开场镜头，建立场景和氛围`,
+        `${referenceImage ? '基于参考图' : ''} 动作镜头，主体表演或中文对话`,
+        `${referenceImage ? '基于参考图' : ''} 反应镜头，细节特写或情绪表现`,
+        `${referenceImage ? '基于参考图' : ''} 结局镜头，高潮收尾或场景结束`
+      ];
+      
+      // 填充到4个分镜
+      for (let i = processedDetails.length; i < 4; i++) {
+        processedDetails.push({
+          description: defaultDescriptions[i],
+          duration: 3,
+          shotType: '',
+          visualDescription: '',
+          composition: '',
+          continuity: ''
+        });
+      }
     }
     
     // 构建4宫格漫画分镜的提示词
@@ -1867,67 +1991,115 @@ export default function InfiniteCanvasApp() {
       prevEdges => [...prevEdges, newEdge]
     );
 
-    try {
-      // 生成包含4个分镜的单张图片
-      let imageUrl;
-      
-      if (refImage) {
-        console.log(`生成4宫格漫画分镜图: 使用参考图 + 分镜描述`);
-        // 使用参考图生成4宫格漫画分镜图 - 图片不显示秒数
-        const gridPrompt = `请严格按照参考图片生成一张4宫格漫画分镜图，确保生成的图片与参考图在风格、人物、场景等方面完全一致：
+    // 带重试机制的4宫格漫画分镜图生成
+    let imageUrl = null;
+    let success = false;
+    let lastError = null;
+    const maxRetries = 3;
+    
+    // 准备提示词
+    let gridPrompt;
+    if (refImage) {
+      console.log(`生成4宫格漫画分镜图: 使用参考图 + 分镜描述`);
+      // 使用参考图生成4宫格漫画分镜图 - 图片不显示秒数
+      gridPrompt = `请严格按照参考图片生成一张标准4宫格漫画分镜图，确保生成的图片与参考图在风格、人物、场景等方面完全一致：
 
-分镜内容：
-${processedDetails[0].description}
-${processedDetails[1].description}
-${processedDetails[2].description}
-${processedDetails[3].description}
+分镜内容（4个分镜）：
+分镜1：${processedDetails[0].description}
+分镜2：${processedDetails[1].description}
+分镜3：${processedDetails[2].description}
+分镜4：${processedDetails[3].description}
 
-重要要求：
-1. 生成的4宫格图片必须与参考图的画风、色彩、人物造型完全一致
-2. 人物形象、服装、发型等细节要与参考图保持一致
-3. 场景风格、背景元素要与参考图一致
-4. 生成4个等分的分镜格，每个分镜格展现一个分镜内容
-5. 保持整体视觉连贯性，不要显示任何文本或数字
-
-强调：
-- 重点参考原图的绘画风格、色彩搭配、人物特征
-- 确保4个分镜的人物角色完全相同
-- 场景元素要与参考图保持一致`;
-        
-        imageUrl = await generateImageFromRef(
-          gridPrompt,
-          refImage,
-          newNode.data.model,
-          newNode.data.ratio
-        );
-      } else {
-        console.log(`生成4宫格漫画分镜图: 仅使用分镜描述`);
-        // 没有参考图片时直接生成4宫格漫画分镜图 - 图片不显示秒数
-        const gridPrompt = `请基于以下4个分镜描述生成一张4宫格漫画分镜图，确保4个分镜在艺术风格、人物造型和视觉风格上保持一致：
-
-${processedDetails[0].description}
-${processedDetails[1].description}
-${processedDetails[2].description}
-${processedDetails[3].description}
-
-要求：
-- 生成4宫格漫画分镜图，每个分镜格大小一致
-- 保持统一的漫画风格、色彩和人物造型
-- 确保4个分镜在视觉上连贯统一
-- 图片中不要显示任何文本或数字
+严格要求：
+1. 必须生成一张包含4个分镜格的图片，不多不少
+2. 4个分镜格必须大小相等，排列成2×2的网格布局
+3. 生成的4宫格图片必须与参考图的画风、色彩、人物造型完全一致
+4. 人物形象、服装、发型等所有细节要与参考图保持一致
+5. 每个分镜格分别展现上述4个分镜内容之一
+6. 不要在任何位置显示数字或文本标记
+7. 保持整体视觉连贯性
 
 特别强调：
+- 必须是标准的2×2四宫格布局，不是3格或其他布局
+- 重点参考原图的绘画风格、色彩搭配、人物特征
+- 确保4个分镜的人物角色完全相同
+- 每个分镜格的内容必须清晰可辨，与上述分镜内容一一对应`;
+    } else {
+      console.log(`生成4宫格漫画分镜图: 仅使用分镜描述`);
+      // 没有参考图片时直接生成4宫格漫画分镜图 - 图片不显示秒数
+      gridPrompt = `请基于以下4个分镜描述生成一张标准4宫格漫画分镜图，确保4个分镜在艺术风格、人物造型和视觉风格上保持一致：
+
+分镜内容（4个分镜）：
+分镜1：${processedDetails[0].description}
+分镜2：${processedDetails[1].description}
+分镜3：${processedDetails[2].description}
+分镜4：${processedDetails[3].description}
+
+严格要求：
+1. 必须生成一张包含4个分镜格的图片，不多不少
+2. 4个分镜格必须大小相等，排列成标准的2×2网格布局
+3. 保持统一的漫画风格、色彩和人物造型
+4. 确保4个分镜在视觉上连贯统一
+5. 图片中不要显示任何文本或数字
+
+特别强调：
+- 必须是标准的2×2四宫格布局，不是3格或其他布局
 - 所有4个分镜中的人物角色必须完全相同，包括外貌特征、服装、发型等
 - 人物表情、姿势可以变化，但人物形象必须保持一致
-- 确保4个分镜的人物形象和场景风格完全统一`;
+- 确保4个分镜的人物形象和场景风格完全统一
+- 每个分镜格的内容必须清晰可辨，与上述分镜内容一一对应`;
+    }
+    
+    // 重试机制
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`4宫格漫画分镜图生成尝试 ${attempt}/${maxRetries}`);
         
-        imageUrl = await generateImage(
-          gridPrompt,
-          newNode.data.model,
-          newNode.data.ratio
-        );
+        if (refImage) {
+          imageUrl = await generateImageFromRef(
+            gridPrompt,
+            refImage,
+            newNode.data.model,
+            newNode.data.ratio
+          );
+        } else {
+          imageUrl = await generateImage(
+            gridPrompt,
+            newNode.data.model,
+            newNode.data.ratio
+          );
+        }
+        
+        // 成功生成，跳出重试循环
+        success = true;
+        break;
+      } catch (error) {
+        lastError = error;
+        console.error(`4宫格漫画分镜图生成尝试 ${attempt}/${maxRetries} 失败:`, error);
+        
+        // 如果不是最后一次尝试，等待一段时间再重试
+        if (attempt < maxRetries) {
+          // 对于429错误（速率限制），需要更长的等待时间
+          const isRateLimitError = error.message && error.message.includes('429');
+          let waitTime;
+          
+          if (isRateLimitError) {
+            // 速率限制错误，使用指数退避策略，等待更长时间
+            waitTime = Math.min(5000 * Math.pow(2, attempt - 1), 30000); // 5秒, 10秒, 20秒，最多30秒
+            console.log(`4宫格漫画分镜图生成遇到速率限制，等待 ${waitTime}ms 后重试...`);
+          } else {
+            // 其他错误，使用常规等待时间
+            waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
+            console.log(`4宫格漫画分镜图生成等待 ${waitTime}ms 后重试...`);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
+    }
 
+    // 处理生成结果
+    if (success && imageUrl) {
       // 更新节点状态 - 生成成功后显示图片
       handleUpdateWorkflowFixed(
         prevNodes => prevNodes.map(n => 
@@ -1947,9 +2119,12 @@ ${processedDetails[3].description}
       );
       
       console.log('4宫格漫画分镜图生成完成');
-    } catch (error) {
-      console.error('4宫格漫画分镜图生成失败:', error);
-      // 生成失败时重置生成状态
+    } else {
+      console.error(`4宫格漫画分镜图所有 ${maxRetries} 次尝试都失败了:`, lastError);
+      
+      // 所有重试都失败了，使用占位图片
+      const mockUrl = `https://placehold.co/800x450/e74c3c/ffffff?text=${encodeURIComponent('4宫格漫画生成失败')}`;
+      
       handleUpdateWorkflowFixed(
         prevNodes => prevNodes.map(n => 
           n.id === newNodeId 
@@ -1957,6 +2132,7 @@ ${processedDetails[3].description}
                 ...n, 
                 data: { 
                   ...n.data, 
+                  generatedImage: mockUrl,
                   isGenerating: false 
                 } 
               } 
