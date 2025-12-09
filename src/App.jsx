@@ -1506,34 +1506,35 @@ export default function InfiniteCanvasApp() {
       } catch (error) { 
           console.error("Video generation error:", error); 
           
-          // 如果是API Key缺失错误，显示API Key配置模态框
+          // 根据错误类型显示友好的用户提示
           if (error.code === 'API_KEY_MISSING') {
+            // API Key缺失错误
             setShowApiKeyModal(true);
-          }
-          
-          // 如果是网络错误，显示友好的错误消息
-          if (error.isNetworkError || error.message.includes('网络连接失败') || error.message.includes('Failed to fetch')) {
-            console.warn('🌐 检测到网络连接问题，将使用备用视频');
-            // 设置网络错误状态，可以用于显示通知
+            error('请配置API Key后才能使用Sora2视频生成功能', 'API Key未配置');
+          } else if (error.code === 'TIMEOUT_ERROR') {
+            // 超时错误
+            error(error.solution || '视频生成超时，请稍后重试或尝试简化提示词', '视频生成超时');
+          } else if (error.isNetworkError || error.message.includes('网络连接失败') || error.message.includes('Failed to fetch')) {
+            // 网络错误
+            console.warn('🌐 检测到网络连接问题');
             setNetworkError(true);
-            // 3秒后清除错误状态
             setTimeout(() => setNetworkError(false), 3000);
-          }
-          
-          // 如果是内容政策违规错误，显示用户友好的提示
-          if (error.message && error.message.includes('内容政策')) {
-            addNotification({
-              id: Date.now(),
-              type: 'error',
-              title: '内容政策违规',
-              message: '您输入的提示词可能违反了内容政策，请尝试修改提示词或避免使用敏感内容。',
-              duration: 5000
-            });
+            error('网络连接失败，请检查网络连接后重试', '网络错误');
+          } else if (error.message && error.message.includes('内容政策')) {
+            // 内容政策违规
+            error('您输入的提示词可能违反了内容政策，请尝试修改提示词或避免使用敏感内容。', '内容政策违规');
+          } else if (error.message && error.message.includes('服务器错误') || error.message.includes('500')) {
+            // 服务器错误
+            error('Sora2视频生成服务暂时不可用，请稍后重试', '服务器错误');
+          } else {
+            // 其他错误
+            const errorMessage = error.message || '未知错误';
+            error(`视频生成失败: ${errorMessage}。请检查提示词内容或稍后重试。`, '生成失败');
           }
           
           return null; 
       } 
-  }, [setShowApiKeyModal, setNetworkError]);
+  }, [setShowApiKeyModal, setNetworkError, error]);
 
   // Workflow Helpers
   const currentEpisodeId = project.currentEpisodeId;
@@ -1586,7 +1587,7 @@ export default function InfiniteCanvasApp() {
 
       // 创建从源节点到分镜节点的连线
       newEdges.push({
-        id: `edge-${sourceNode.id}-${newNodeId}`,
+        id: `edge-${sourceNode.id}-${newNodeId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
         source: sourceNode.id,
         target: newNodeId
       });
@@ -1823,7 +1824,7 @@ export default function InfiniteCanvasApp() {
 
     // 创建从源节点到网格节点的连线
     const newEdge = {
-      id: `edge-${sourceNode.id}-${newNodeId}`,
+      id: `edge-${sourceNode.id}-${newNodeId}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
       source: sourceNode.id,
       target: newNodeId
     };
@@ -2001,7 +2002,7 @@ ${processedDetails[3].description}
     
     handleUpdateWorkflowFixed(
         prevNodes => [...prevNodes, newNode],
-        prevEdges => sourceId ? [...prevEdges, { id: `${sourceId}-${newNode.id}`, source: sourceId, target: newNode.id }] : prevEdges
+        prevEdges => sourceId ? [...prevEdges, { id: `edge-${sourceId}-${newNode.id}-${Date.now()}`, source: sourceId, target: newNode.id }] : prevEdges
     );
   }, [offset, scale, handleUpdateWorkflowFixed]);
 
@@ -2508,7 +2509,26 @@ ${processedDetails[3].description}
   }, [selectedIds, nodes]);
 
   const onConnectStart = useCallback((nodeId, e) => { e.stopPropagation(); setConnecting({ nodeId }); setMousePos(getHandlePosition(nodeId, 'source', nodes)); setMenu(null); }, [nodes]);
-  const onConnectEnd = useCallback((targetId, e) => { e.stopPropagation(); if (connecting && connecting.nodeId !== targetId) { handleUpdateWorkflow(null, es => [...es, { id: `${connecting.nodeId}-${targetId}`, source: connecting.nodeId, target: targetId }]); } setConnecting(null); }, [connecting, handleUpdateWorkflow]);
+  const onConnectEnd = useCallback((targetId, e) => { 
+    e.stopPropagation(); 
+    if (connecting && connecting.nodeId !== targetId) { 
+      // 检查是否已经存在相同的连接
+      const existingEdge = edges.find(edge => 
+        edge.source === connecting.nodeId && edge.target === targetId
+      );
+      
+      // 如果已经存在相同的连接，则不创建新连接
+      if (!existingEdge) {
+        // 生成唯一的边ID，使用时间戳确保唯一性
+        const uniqueEdgeId = `edge-${connecting.nodeId}-${targetId}-${Date.now()}`;
+        handleUpdateWorkflow(null, es => [...es, { id: uniqueEdgeId, source: connecting.nodeId, target: targetId }]); 
+      } else {
+        // 可选：显示提示信息告知用户连接已存在
+        console.log('连接已存在，不创建重复连接');
+      }
+    } 
+    setConnecting(null); 
+  }, [connecting, handleUpdateWorkflow, edges]);
   const removeEdge = useCallback((id) => { handleUpdateWorkflow(ns => ns, es => es.filter(e => e.id !== id)); }, [handleUpdateWorkflow]);
   
   const handleKeyDown = useCallback((e) => {
@@ -2701,10 +2721,19 @@ ${processedDetails[3].description}
                {menu && <BezierCurve start={getHandlePosition(menu.sourceId, 'source', nodes)} end={{ x: menu.x, y: menu.y }} stroke="#94a3b8" strokeDasharray="4,4" strokeWidth={2} />}
             </svg>
             {(nodes || []).map(n => {
+                // 去重处理，确保每个源节点只被计算一次
+                const sourceNodes = (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(Boolean);
+                const uniqueSourceIds = new Set();
+                const uniqueSourceNodes = sourceNodes.filter(node => {
+                    if (uniqueSourceIds.has(node.id)) return false;
+                    uniqueSourceIds.add(node.id);
+                    return true;
+                });
+                
                 const linked = { 
-                    textInput: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).find(src => src?.type === 'text'), 
-                    imageInputs: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(src => src?.type === 'image'),
-                    videoInputs: (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(src => src?.type === 'video')
+                    textInput: uniqueSourceNodes.find(src => src?.type === 'text'), 
+                    imageInputs: uniqueSourceNodes.filter(src => src?.type === 'image'),
+                    videoInputs: uniqueSourceNodes.filter(src => src?.type === 'video')
                 };
                 return <NodeCard key={n.id} node={n} updateNode={updateNode} isSelected={selectedIds.has(n.id)} onSelect={onNodeSelect} onConnectStart={onConnectStart} onConnectEnd={onConnectEnd} onSpawnNodes={handleSpawnNodes} onDelete={deleteNode} linkedSources={linked} apiFunctions={apiFunctions} onShowAssetModal={() => setShowAssetModal(true)} />;
             })}

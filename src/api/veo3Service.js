@@ -157,7 +157,7 @@ export const generateVeo3Video = async (prompt, model = 'veo_3_1-fast', images =
     
     // 轮询查询任务状态
     let attempts = 0;
-    const maxAttempts = 60; // 最多查询60次（5分钟）
+    const maxAttempts = 120; // 最多查询60次（5分钟）
     const pollInterval = 5000; // 每5秒查询一次
     
     while (attempts < maxAttempts) {

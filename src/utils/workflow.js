@@ -129,7 +129,7 @@ export const createBatchNodes = (sourceNode, count, nodes, edges) => {
     });
     
     newEdges.push({ 
-      id: `${sourceNode.id}-${nid}`, 
+      id: `edge-${sourceNode.id}-${nid}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`, 
       source: sourceNode.id, 
       target: nid 
     });

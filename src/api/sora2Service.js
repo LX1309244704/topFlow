@@ -198,7 +198,7 @@ export const generateSora2Video = async (prompt, model = 'sora2', images = [], a
     
     // 轮询查询任务状态
     let attempts = 0;
-    const maxAttempts = 60; // 最多查询60次（5分钟）
+    const maxAttempts = 120; // 最多查询60次（5分钟）
     const pollInterval = 5000; // 每5秒查询一次
     
     while (attempts < maxAttempts) {
@@ -231,18 +231,49 @@ export const generateSora2Video = async (prompt, model = 'sora2', images = [], a
       console.log(`Sora2视频生成中，进度: ${statusResponse.progress || attempts}/${maxAttempts}, 当前状态: ${statusResponse.status}`);
     }
     
-    throw new Error('Sora2视频生成超时');
+    const enhancedError = new Error('Sora2视频生成超时（5分钟）');
+    enhancedError.code = 'TIMEOUT_ERROR';
+    enhancedError.solution = '视频生成可能需要更长时间，请稍后重试或尝试简化提示词';
+    enhancedError.details = '视频生成任务在5分钟内未完成，可能是服务器负载较高或生成复杂内容需要更长时间';
+    throw enhancedError;
   } catch (error) {
     console.error('Sora2视频生成错误:', error);
     
-    // 如果是网络错误，提供备用方案
-    if (error.isNetworkError || error.message.includes('Failed to fetch') || error.message.includes('网络连接失败')) {
-      // 返回示例视频作为占位符
-      return 'https://www.w3schools.com/html/mov_bbb.mp4';
+    // 创建友好的错误信息
+    let userFriendlyError = new Error();
+    
+    if (error.code === 'TIMEOUT_ERROR') {
+      userFriendlyError.message = '视频生成超时';
+      userFriendlyError.code = 'TIMEOUT_ERROR';
+      userFriendlyError.solution = error.solution;
+      userFriendlyError.details = error.details;
+    } else if (error.isNetworkError || error.message.includes('Failed to fetch') || error.message.includes('网络连接失败')) {
+      userFriendlyError.message = '网络连接失败';
+      userFriendlyError.code = 'NETWORK_ERROR';
+      userFriendlyError.solution = '请检查网络连接，或稍后重试';
+      userFriendlyError.details = '无法连接到Sora2视频生成服务';
+    } else if (error.message.includes('API Key')) {
+      userFriendlyError.message = 'API Key未配置';
+      userFriendlyError.code = 'API_KEY_ERROR';
+      userFriendlyError.solution = '请点击左下角"API Key"按钮配置有效的API Key';
+      userFriendlyError.details = '需要有效的API Key才能使用Sora2视频生成功能';
+    } else if (error.message.includes('服务器错误') || error.message.includes('500')) {
+      userFriendlyError.message = '服务器暂时不可用';
+      userFriendlyError.code = 'SERVER_ERROR';
+      userFriendlyError.solution = '服务器可能正在维护，请稍后重试';
+      userFriendlyError.details = 'Sora2视频生成服务暂时不可用';
+    } else {
+      userFriendlyError.message = '视频生成失败';
+      userFriendlyError.code = 'GENERAL_ERROR';
+      userFriendlyError.solution = '请检查提示词内容，或尝试重新生成';
+      userFriendlyError.details = error.message || '未知错误';
     }
     
-    // 对于其他错误，也返回占位符视频，但记录更详细的错误
-    return 'https://www.w3schools.com/html/mov_bbb.mp4';
+    // 保留原始错误信息用于调试
+    userFriendlyError.originalError = error;
+    
+    // 抛出友好的错误信息
+    throw userFriendlyError;
   }
 };
 
