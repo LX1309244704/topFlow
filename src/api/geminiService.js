@@ -531,17 +531,6 @@ export const generateGeminiTextWithImage = async (prompt, refImage) => {
       }
     };
     
-    console.log('📤 Gemini多模态分析API请求参数:', JSON.stringify({
-      ...requestData,
-      contents: [{
-        ...requestData.contents[0],
-        parts: [
-          requestData.contents[0].parts[0],
-          { inlineData: { mimeType: "image/jpeg", data: "[BASE64_DATA_HIDDEN]" } }
-        ]
-      }]
-    }, null, 2));
-    
     let fullText = '';
     fullText = await fetchStreamWithRetry(endpoint, requestData, (text) => {
       // 实时处理文本片段

@@ -1565,13 +1565,21 @@ export default function InfiniteCanvasApp() {
     const baseY = sourceNode.y;
     const verticalSpacing = 180;
 
+    // 计算节点宽度和水平间距
+    const nodeRatio = sourceNode.data.ratio || "16:9";
+    let nodeWidth = 320; // 默认宽度
+    if (nodeRatio === "16:9" || nodeRatio === "4:3") {
+      nodeWidth = 480; // 16:9和4:3比例的宽度
+    }
+    const horizontalSpacing = nodeWidth + 80; // 节点宽度 + 间距
+    
     // 创建4个分镜节点，初始显示生成状态
     scenes.forEach((scene, index) => {
       const newNodeId = Date.now() + index;
       newNodes.push({
         id: newNodeId,
         type: 'image',
-        x: baseX + (index % 2) * 350,
+        x: baseX + (index % 2) * horizontalSpacing,
         y: baseY + Math.floor(index / 2) * verticalSpacing,
         data: {
           prompt: scene,
@@ -1603,33 +1611,57 @@ export default function InfiniteCanvasApp() {
     let successCount = 0;
     let failureCount = 0;
     
-    // 并发生成所有分镜图片
+    // 并发生成所有分镜图片，每个分镜图片都有重试机制
     const generatePromises = newNodes.map(async (node) => {
-      try {
-        let imageUrl;
-        
-        // 优先使用传入的referenceImage，如果没有则使用sourceNode的图片
-        const refImage = referenceImage || sourceNode.data.generatedImage;
-        
-        if (refImage) {
-          console.log(`分镜生成 ${node.id}: 使用参考图 + 提示词 "${node.data.prompt}"`);
-          // 使用参考图生成分镜
-          imageUrl = await generateImageFromRef(
-            node.data.prompt,              // 分镜提示词
-            refImage,                      // 参考图片
-            node.data.model,               // 模型参数
-            node.data.ratio                // 比例参数
-          );
-        } else {
-          console.log(`分镜生成 ${node.id}: 仅使用提示词 "${node.data.prompt}"`);
-          // 没有参考图片时使用普通生成
-          imageUrl = await generateImage(
-            node.data.prompt,
-            node.data.model,
-            node.data.ratio
-          );
+      let imageUrl = null;
+      let success = false;
+      let lastError = null;
+      const maxRetries = 3;
+      
+      // 优先使用传入的referenceImage，如果没有则使用sourceNode的图片
+      const refImage = referenceImage || sourceNode.data.generatedImage;
+      
+      // 重试机制
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          if (refImage) {
+            console.log(`分镜生成尝试 ${attempt}/${maxRetries} (节点 ${node.id}): 使用参考图 + 提示词 "${node.data.prompt}"`);
+            // 使用参考图生成分镜
+            imageUrl = await generateImageFromRef(
+              node.data.prompt,              // 分镜提示词
+              refImage,                      // 参考图片
+              node.data.model,               // 模型参数
+              node.data.ratio                // 比例参数
+            );
+          } else {
+            console.log(`分镜生成尝试 ${attempt}/${maxRetries} (节点 ${node.id}): 仅使用提示词 "${node.data.prompt}"`);
+            // 没有参考图片时使用普通生成
+            imageUrl = await generateImage(
+              node.data.prompt,
+              node.data.model,
+              node.data.ratio
+            );
+          }
+          
+          // 成功生成，跳出重试循环
+          success = true;
+          break;
+        } catch (error) {
+          lastError = error;
+          console.error(`分镜图片生成尝试 ${attempt}/${maxRetries} 失败 (节点 ${node.id}):`, error);
+          
+          // 如果不是最后一次尝试，等待一段时间再重试
+          if (attempt < maxRetries) {
+            // 根据尝试次数增加等待时间
+            const waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
+            console.log(`分镜图片生成等待 ${waitTime}ms 后重试 (节点 ${node.id})...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+          }
         }
+      }
 
+      // 处理生成结果
+      if (success && imageUrl) {
         // 更新节点状态 - 成功生成后显示图片
         handleUpdateWorkflowFixed(
           prevNodes => prevNodes.map(n => 
@@ -1649,9 +1681,9 @@ export default function InfiniteCanvasApp() {
         );
         successCount++;
         return { nodeId: node.id, success: true, imageUrl };
-      } catch (error) {
-        console.error(`分镜图片生成失败 (节点 ${node.id}):`, error);
-        // 生成失败时重置生成状态，使用占位图片
+      } else {
+        console.error(`分镜图片所有 ${maxRetries} 次尝试都失败了 (节点 ${node.id}):`, lastError);
+        // 所有重试都失败了，使用占位图片
         const textContent = node.data.prompt ? node.data.prompt.split(/\s+/).slice(0, 3).join(' ') : '分镜';
         const encodedText = encodeURIComponent(textContent + ` (分镜 ${node.id.toString().slice(-4)})`);
         const mockW = 800;
@@ -1674,7 +1706,7 @@ export default function InfiniteCanvasApp() {
           null
         );
         failureCount++;
-        return { nodeId: node.id, success: false, error: error.message };
+        return { nodeId: node.id, success: false, error: lastError?.message || '未知错误' };
       }
     });
 
@@ -2752,22 +2784,19 @@ ${processedDetails[3].description}
            >
              <Minus size={16} />
            </button>
-           <span className="text-sm font-medium text-gray-700 min-w-[40px] text-center">
+           <button 
+             onClick={() => setScale(1)}
+             className="text-sm font-medium text-gray-700 min-w-[40px] text-center px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+             title="重置到100%"
+           >
              {Math.round(scale * 100)}%
-           </span>
+           </button>
            <button 
              onClick={() => setScale(s => Math.min(3, s + 0.1))}
              className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600"
              title="放大"
            >
              <Plus size={16} />
-           </button>
-           <button 
-             onClick={() => setScale(1)}
-             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600 text-xs"
-             title="重置到100%"
-           >
-             100%
            </button>
          </div>
         </div>

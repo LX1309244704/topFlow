@@ -230,6 +230,163 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
 
 
+  // 带重试机制的API调用函数
+  const generateStoryboardWithRetry = async (storyboardPrompt, hasReferenceImage, maxRetries = 3) => {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`分镜生成尝试 ${attempt}/${maxRetries}`);
+        
+        // 如果有参考图片，使用多模态分析API；否则使用普通文本生成API
+        let response;
+        if (hasReferenceImage) {
+          // 使用多模态分析API，将参考图片传递给AI进行分析
+          response = await apiClient.generateTextWithImage(storyboardPrompt, node.data.generatedImage);
+        } else {
+          // 没有参考图片时使用普通文本生成API
+          response = await generateText(storyboardPrompt);
+        }
+        
+        console.log(`尝试 ${attempt}: AI返回的分镜描述:`, response);
+        
+        // 处理返回的分镜描述
+        let scenes = [];
+        
+        // 尝试解析JSON格式（如果AI返回了JSON）
+        try {
+          let cleanResponse = response;
+          
+          // 首先尝试提取JSON部分
+          const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            cleanResponse = jsonMatch[1].trim();
+          } else if (response.includes('{') && response.includes('}')) {
+            // 如果没有代码块标记，尝试提取第一个JSON对象
+            const jsonStart = response.indexOf('{');
+            const jsonEnd = response.lastIndexOf('}') + 1;
+            if (jsonStart !== -1 && jsonEnd > jsonStart) {
+              cleanResponse = response.substring(jsonStart, jsonEnd);
+            }
+          }
+          
+          console.log(`尝试 ${attempt}: 尝试解析的JSON内容:`, cleanResponse);
+          
+          const jsonData = JSON.parse(cleanResponse);
+          
+          // 支持多种JSON格式
+          if (jsonData && jsonData.keyframes && Array.isArray(jsonData.keyframes)) {
+            // 使用新的keyframes格式的数据
+            scenes = jsonData.keyframes.map(frame => frame.image_prompt);
+            console.log(`尝试 ${attempt}: JSON格式分镜数据 (keyframes):`, jsonData.keyframes);
+          } else if (jsonData && jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
+            // 使用keyframe_sequence格式的数据
+            scenes = jsonData.keyframe_sequence.map(frame => frame.description);
+            console.log(`尝试 ${attempt}: JSON格式分镜数据 (keyframe_sequence):`, jsonData.keyframe_sequence);
+          } else if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
+            // 使用frames格式的数据
+            scenes = jsonData.frames.map(frame => frame.imagePrompt || frame.description);
+            console.log(`尝试 ${attempt}: JSON格式分镜数据 (frames):`, jsonData.frames);
+          } else {
+            throw new Error('Invalid JSON format - no valid array found');
+          }
+        } catch (error) {
+          // 如果不是JSON格式，使用智能文本处理方式
+          console.log(`尝试 ${attempt}: JSON解析失败，使用智能文本处理方式:`, error.message);
+          
+          // 提取真正有用的描述性文本
+          const lines = response.split('\n')
+            .map(s => s.trim())
+            .filter(s => {
+              // 过滤掉：空行、代码块标记、JSON结构标记、描述性标题
+              return s.length > 0 && 
+                     !s.includes('```') && 
+                     !s.includes('{') && 
+                     !s.includes('}') &&
+                     !s.includes('镜头') && 
+                     !s.includes('要求') && 
+                     !s.includes('分镜') &&
+                     !s.includes('关键帧') &&
+                     !s.includes('描述') &&
+                     !s.includes('JSON格式') &&
+                     !s.includes('专业') &&
+                     !s.includes('基于');
+            })
+            .slice(0, 4);
+          
+          scenes = lines;
+          console.log(`尝试 ${attempt}: 智能处理后的分镜描述:`, scenes);
+        }
+
+        console.log(`尝试 ${attempt}: 处理后的分镜描述:`, scenes);
+
+        // 检查是否成功获取了有效的分镜描述
+        if (scenes.length >= 2) { // 至少需要2个有效的分镜描述
+          console.log(`尝试 ${attempt}: 成功获取分镜描述，返回场景`);
+          return { success: true, scenes, response };
+        } else {
+          throw new Error(`获取的分镜描述数量不足: ${scenes.length}/4`);
+        }
+      } catch (error) {
+        lastError = error;
+        console.error(`尝试 ${attempt}/${maxRetries} 失败:`, error);
+        
+        // 如果不是最后一次尝试，等待一段时间再重试
+        if (attempt < maxRetries) {
+          // 根据尝试次数增加等待时间
+          const waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
+          console.log(`等待 ${waitTime}ms 后重试...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    // 所有尝试都失败了
+    console.error(`所有 ${maxRetries} 次尝试都失败了，使用默认分镜描述`);
+    return { 
+      success: false, 
+      error: lastError,
+      scenes: [] 
+    };
+  };
+
+  // 带重试机制的单个分镜图片生成函数
+  const generateStoryboardImageWithRetry = async (nodeId, prompt, hasReferenceImage, referenceImage, maxRetries = 3) => {
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`分镜图片生成尝试 ${attempt}/${maxRetries}, 节点ID: ${nodeId}`);
+        
+        // 调用API生成分镜图片
+        const result = await apiClient.generateImage(prompt, hasReferenceImage ? referenceImage : null);
+        
+        console.log(`尝试 ${attempt}: 分镜图片生成成功，节点ID: ${nodeId}`);
+        return { success: true, image: result, nodeId };
+      } catch (error) {
+        lastError = error;
+        console.error(`分镜图片生成尝试 ${attempt}/${maxRetries} 失败, 节点ID: ${nodeId}:`, error);
+        
+        // 如果不是最后一次尝试，等待一段时间再重试
+        if (attempt < maxRetries) {
+          // 根据尝试次数增加等待时间
+          const waitTime = 1000 * attempt; // 第1次等待1秒，第2次等待2秒
+          console.log(`分镜图片生成等待 ${waitTime}ms 后重试...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+    
+    // 所有尝试都失败了
+    console.error(`分镜图片所有 ${maxRetries} 次尝试都失败了，节点ID: ${nodeId}`);
+    return { 
+      success: false, 
+      error: lastError,
+      nodeId,
+      image: null
+    };
+  };
+
   // 分镜模式处理函数
   const handleStoryboard = async () => {
     if (!node.data.prompt) return;
@@ -249,160 +406,223 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       let storyboardPrompt;
       
       if (node.data.generatedImage) {
-        // 如果有参考图片，使用优化的"启承转结"逻辑生成分镜
-        storyboardPrompt = `你是一位专业的视频预可视化艺术家，专精于为AI视频生成创作首尾帧驱动的连贯关键帧序列。
+        // 如果有参考图片，使用更专业的电影化分镜提示词
+        storyboardPrompt = `你是一位专业的电影导演和视觉艺术家，擅长创作具有电影感的分镜序列。请仔细分析参考图片的视觉元素，并基于基础提示词创作4个连贯的电影化关键帧描述。
 
-请基于提供的图像和基础提示词，生成4个视觉连续的关键帧描述，要求：
+基础提示词：${node.data.prompt}
 
-严格视觉连续性：
-- 所有4个关键帧必须基于同一源图像元素
-- 保持相同：人物/物体、服装/外观、环境背景、光照条件、色彩风格
-- 仅允许变化：姿势、表情、镜头构图、相机角度、部分遮挡
+请按照以下专业标准生成分镜描述：
 
-首尾帧视频生成优化：
-- 关键帧#1与关键帧#4应形成自然的动作或状态循环
-- 关键帧之间的变化需平滑、线性可预测，便于AI插值
+场景分解
+- 主体：详细描述所有主要人物/物体的特征、服装、状态
+- 环境：分析空间布局、地面材质、背景建筑、天气状况
+- 环境与光线：光线方向、色调、氛围关键词、时间感
 
-四帧叙事逻辑：
-- 关键帧1：初始状态（视频起点）
-- 关键帧2：动作发展/情绪推进
-- 关键帧3：变化高潮/转折点
-- 关键帧4：结束状态（视频终点，可与起点呼应）
+主题与故事
+- 主题：提炼核心情感或概念（如孤寂、沉思、转变等）
+- 故事梗概：用一句话概括情节发展
+- 情绪弧线：建立→发展→转折→结局，描述情绪如何递进
 
-基础提示词: ${node.data.prompt}
+电影化手法
+- 镜头推进策略：从环境到细节的渐进式镜头语言
+- 摄像机运动计划：具体运动类型（推近、横移、手持微颤等）及目的
+- 镜头与曝光建议：焦段选择、景深控制、快门感、光线色彩处理
 
-请按以下格式输出每个关键帧的详细描述：
+关键帧列表（4个核心镜头）
+每个关键帧必须包含：
+- 构图：画面布局、人物位置、空间关系
+- 动作/节拍：具体动作描述及情感表达
+- 摄像机：机位、高度、角度、运动方式
+- 镜头/景深：焦段选择、焦点控制、景深效果
+- 光线与调色：光源方向、光影效果、色调处理、氛围营造
 
-【KF#/4 | 镜头类型 | 视频时间点】
-画面描述：详细的视觉内容，包括所有可见元素的状态
-构图参数：视角、景别、焦点主体
-连续性说明：与前后帧的视觉连接点
+请严格保持参考图片的视觉一致性：
+- 所有主体特征、服装、环境元素必须完全一致
+- 光照方向和色温必须保持逻辑一致
+- 仅允许变化：镜头角度、人物姿态、表情变化、部分遮挡
 
-将上面的提示词输出内容使用json格式输出，方便分镜生成解析生成分镜图的提示词`;
+请使用以下JSON格式输出，方便解析为4个分镜图的提示词：
+
+{
+  "title": "分镜主题标题",
+  "theme": "核心主题",
+  "story_synopsis": "故事梗概",
+  "visual_consistency": {
+    "main_subjects": "主体描述",
+    "color_palette": ["主色调1", "主色调2", "主色调3"],
+    "lighting_direction": "光线方向",
+    "atmosphere_keywords": ["氛围关键词1", "氛围关键词2", "氛围关键词3"],
+    "environment_style": "环境风格"
+  },
+  "keyframes": [
+    {
+      "index": 1,
+      "duration": "3.0秒",
+      "shot_type": "大远景/低角度",
+      "composition": "详细的构图描述，包括人物位置、空间关系、引导线",
+      "action_beat": "建立阶段的动作/节拍描述",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    },
+    {
+      "index": 2,
+      "duration": "2.5秒",
+      "shot_type": "特写",
+      "composition": "详细的构图描述，包括面部位置、三分法构图",
+      "action_beat": "发展阶段的动作/节拍描述，包含微表情变化",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    },
+    {
+      "index": 3,
+      "duration": "2.0秒",
+      "shot_type": "特写/低角度",
+      "composition": "详细的构图描述，包括仰拍角度、线条处理",
+      "action_beat": "转折阶段的动作/节拍描述，表现决定性时刻",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    },
+    {
+      "index": 4,
+      "duration": "3.0秒",
+      "shot_type": "中远景/平视",
+      "composition": "详细的构图描述，包括人物位置、空间关系",
+      "action_beat": "结局阶段的动作/节拍描述，展现后续发展",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    }
+  ]
+}
+
+每个关键帧的image_prompt必须极为详细，包含主体、环境、光线、构图、氛围等所有视觉要素，确保AI能够生成高质量的电影感图像。`;
       } else {
-        // 如果没有参考图片，使用优化的"启承转结"逻辑
-        storyboardPrompt = `你是一位专业的视频预可视化艺术家，专精于为AI视频生成创作首尾帧驱动的连贯关键帧序列。
+        // 如果没有参考图片，使用通用的专业电影化分镜提示词
+        storyboardPrompt = `你是一位专业的电影导演和视觉艺术家，擅长创作具有电影感的分镜序列。请基于基础提示词创作4个连贯的电影化关键帧描述。
 
-请基于基础提示词，生成4个视觉连续的关键帧描述，要求：
+基础提示词：${node.data.prompt}
 
-严格视觉连续性：
-- 所有4个关键帧必须基于同一场景设定
-- 保持一致：人物设定、环境风格、色彩基调、光照条件
-- 仅允许变化：姿势动作、表情变化、镜头角度、构图景别
+请按照以下专业标准生成分镜描述：
 
-首尾帧视频生成优化：
-- 关键帧#1与关键帧#4应形成自然的动作循环
-- 关键帧之间的变化需平滑、可预测，便于AI插值
+场景分解
+- 主体：详细描述所有主要人物/物体的特征、服装、状态
+- 环境：分析空间布局、地面材质、背景建筑、天气状况
+- 环境与光线：光线方向、色调、氛围关键词、时间感
 
-四帧叙事逻辑：
-- 关键帧1：启 - 初始状态建立
-- 关键帧2：承 - 动作发展推进  
-- 关键帧3：转 - 变化高潮转折
-- 关键帧4：结 - 结束状态收尾
+主题与故事
+- 主题：提炼核心情感或概念（如孤寂、沉思、转变等）
+- 故事梗概：用一句话概括情节发展
+- 情绪弧线：建立→发展→转折→结局，描述情绪如何递进
 
-基础提示词: ${node.data.prompt}
+电影化手法
+- 镜头推进策略：从环境到细节的渐进式镜头语言
+- 摄像机运动计划：具体运动类型（推近、横移、手持微颤等）及目的
+- 镜头与曝光建议：焦段选择、景深控制、快门感、光线色彩处理
 
-请按以下格式输出每个关键帧的详细描述：
+关键帧列表（4个核心镜头）
+每个关键帧必须包含：
+- 构图：画面布局、人物位置、空间关系
+- 动作/节拍：具体动作描述及情感表达
+- 摄像机：机位、高度、角度、运动方式
+- 镜头/景深：焦段选择、焦点控制、景深效果
+- 光线与调色：光源方向、光影效果、色调处理、氛围营造
 
-【KF#/4 | 镜头类型 | 视频时间点】
-画面描述：详细的视觉内容，包括所有可见元素的状态
-构图参数：视角、景别、焦点主体
-连续性说明：与前后帧的视觉连接点
+请确保场景的视觉一致性：
+- 人物特征、服装、环境元素在4个关键帧中保持一致
+- 光照方向和色温保持逻辑一致
+- 镜头变化展现故事的连贯进展
 
-将上面的提示词输出内容使用json格式输出，方便分镜生成解析生成分镜图的提示词`;
+请使用以下JSON格式输出，方便解析为4个分镜图的提示词：
+
+{
+  "title": "分镜主题标题",
+  "theme": "核心主题",
+  "story_synopsis": "故事梗概",
+  "visual_consistency": {
+    "main_subjects": "主体描述",
+    "color_palette": ["主色调1", "主色调2", "主色调3"],
+    "lighting_direction": "光线方向",
+    "atmosphere_keywords": ["氛围关键词1", "氛围关键词2", "氛围关键词3"],
+    "environment_style": "环境风格"
+  },
+  "keyframes": [
+    {
+      "index": 1,
+      "duration": "3.0秒",
+      "shot_type": "大远景/低角度",
+      "composition": "详细的构图描述，包括人物位置、空间关系、引导线",
+      "action_beat": "建立阶段的动作/节拍描述",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述，推荐24mm广角",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    },
+    {
+      "index": 2,
+      "duration": "2.5秒",
+      "shot_type": "特写",
+      "composition": "详细的构图描述，包括面部位置、三分法构图",
+      "action_beat": "发展阶段的动作/节拍描述，包含微表情变化",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述，推荐85mm中长焦",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    },
+    {
+      "index": 3,
+      "duration": "2.0秒",
+      "shot_type": "特写/低角度",
+      "composition": "详细的构图描述，包括仰拍角度、线条处理",
+      "action_beat": "转折阶段的动作/节拍描述，表现决定性时刻",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述，推荐50mm标准镜头",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    },
+    {
+      "index": 4,
+      "duration": "3.0秒",
+      "shot_type": "中远景/平视",
+      "composition": "详细的构图描述，包括人物位置、空间关系",
+      "action_beat": "结局阶段的动作/节拍描述，展现后续发展",
+      "camera_settings": "摄像机机位、高度、角度、运动方式",
+      "lens_depth": "焦段选择和景深效果描述，推荐35mm广角",
+      "lighting_color": "光源方向、光影效果、色调处理",
+      "image_prompt": "用于AI图像生成的专业提示词，包含构图、光影、色彩、氛围等所有细节"
+    }
+  ]
+}
+
+每个关键帧的image_prompt必须极为详细，包含主体、环境、光线、构图、氛围等所有视觉要素，确保AI能够生成高质量的电影感图像。`;
       }
 
       console.log('生成分镜提示词，有参考图片:', !!node.data.generatedImage);
       
-      // 如果有参考图片，使用多模态分析API；否则使用普通文本生成API
-      let response;
-      if (node.data.generatedImage) {
-        // 使用多模态分析API，将参考图片传递给AI进行分析
-        response = await apiClient.generateTextWithImage(storyboardPrompt, node.data.generatedImage);
-      } else {
-        // 没有参考图片时使用普通文本生成API
-        response = await generateText(storyboardPrompt);
-      }
-      console.log('AI返回的分镜描述:', response);
+      // 使用重试机制生成分镜
+      const result = await generateStoryboardWithRetry(storyboardPrompt, !!node.data.generatedImage);
       
-      // 处理返回的分镜描述
-      let scenes = [];
+      // 处理结果
+      let scenes = result.scenes || [];
       
-      // 尝试解析JSON格式（如果AI返回了JSON）
-      try {
-        let cleanResponse = response;
-        
-        // 首先尝试提取JSON部分
-        const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
-        if (jsonMatch) {
-          cleanResponse = jsonMatch[1].trim();
-        } else if (response.includes('{') && response.includes('}')) {
-          // 如果没有代码块标记，尝试提取第一个JSON对象
-          const jsonStart = response.indexOf('{');
-          const jsonEnd = response.lastIndexOf('}') + 1;
-          if (jsonStart !== -1 && jsonEnd > jsonStart) {
-            cleanResponse = response.substring(jsonStart, jsonEnd);
-          }
-        }
-        
-        console.log('尝试解析的JSON内容:', cleanResponse);
-        
-        const jsonData = JSON.parse(cleanResponse);
-        
-        // 支持多种JSON格式
-        if (jsonData && jsonData.keyframe_sequence && Array.isArray(jsonData.keyframe_sequence)) {
-          // 使用keyframe_sequence格式的数据
-          scenes = jsonData.keyframe_sequence.map(frame => frame.description);
-          console.log('JSON格式分镜数据 (keyframe_sequence):', jsonData.keyframe_sequence);
-        } else if (jsonData && jsonData.frames && Array.isArray(jsonData.frames)) {
-          // 使用frames格式的数据
-          scenes = jsonData.frames.map(frame => frame.imagePrompt || frame.description);
-          console.log('JSON格式分镜数据 (frames):', jsonData.frames);
-        } else {
-          throw new Error('Invalid JSON format - no valid array found');
-        }
-      } catch (error) {
-        // 如果不是JSON格式，使用智能文本处理方式
-        console.log('JSON解析失败，使用智能文本处理方式:', error.message);
-        
-        // 提取真正有用的描述性文本
-        const lines = response.split('\n')
-          .map(s => s.trim())
-          .filter(s => {
-            // 过滤掉：空行、代码块标记、JSON结构标记、描述性标题
-            return s.length > 0 && 
-                   !s.includes('```') && 
-                   !s.includes('{') && 
-                   !s.includes('}') &&
-                   !s.includes('镜头') && 
-                   !s.includes('要求') && 
-                   !s.includes('分镜') &&
-                   !s.includes('关键帧') &&
-                   !s.includes('描述') &&
-                   !s.includes('JSON格式') &&
-                   !s.includes('专业') &&
-                   !s.includes('基于');
-          })
-          .slice(0, 4);
-        
-        scenes = lines;
-        console.log('智能处理后的分镜描述:', scenes);
-      }
-
-      console.log('处理后的分镜描述:', scenes);
-
-      // 如果AI返回的分镜描述不足4个，使用默认分镜描述
+      // 如果AI返回的分镜描述不足4个，使用更专业的默认分镜描述
       if (scenes.length < 4) {
         const defaultScenes = node.data.generatedImage ? [
-          `${node.data.prompt} - 保持原图构图和主体`,
-          `${node.data.prompt} - 调整视角和角度`,
-          `${node.data.prompt} - 改变距离和焦点`,
-          `${node.data.prompt} - 展示细节和结果`
+          `${node.data.prompt} - 大远景低角度镜头，人物位于画面下方，展示环境空间，24mm广角，深景深，冷色调，硬朗侧光，电影感构图`,
+          `${node.data.prompt} - 面部特写镜头，三分法构图，眼神低垂，85mm中长焦，极浅景深，戏剧性光影，皮肤质感清晰`,
+          `${node.data.prompt} - 低角度特写镜头，仰拍人物侧脸，下颌线条紧绷，50mm标准镜头，逆光轮廓光，展现决心时刻`,
+          `${node.data.prompt} - 中远景平视镜头，人物背影走向深处，35mm广角，中等景深，光线呼应开场，余韵氛围`
         ] : [
-          `${node.data.prompt} - 远景全景`,
-          `${node.data.prompt} - 中景构图`,
-          `${node.data.prompt} - 近景特写`,
-          `${node.data.prompt} - 细节展示`
+          `${node.data.prompt} - 建立镜头：大远景展现环境与人物关系，低角度构图，冷青色调，硬朗侧光，24mm广角，深景深，孤寂氛围`,
+          `${node.data.prompt} - 发展镜头：面部特写，眼神低垂后缓慢闭上，85mm中长焦，极浅景深，戏剧性光影，呼吸声可闻`,
+          `${node.data.prompt} - 转折镜头：低角度仰拍，猛然睁眼，50mm标准镜头，逆光轮廓光，展现决心与力量`,
+          `${node.data.prompt} - 结局镜头：中远景，人物背影走向远方，35mm广角，中等景深，光线呼应开场，脚步声渐行渐远`
         ];
         
         // 填充不足的场景
@@ -413,24 +633,28 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
       // 创建分镜节点并生成图片
       if (window.topFlow && window.topFlow.createStoryboardNodes) {
-        console.log('开始创建分镜节点，使用优化后的提示词');
+        if (result.success) {
+          console.log('开始创建分镜节点，使用AI生成的提示词');
+        } else {
+          console.log(`分镜生成失败，使用默认分镜描述。错误: ${result.error?.message}`);
+        }
         await window.topFlow.createStoryboardNodes(node, scenes, node.data.generatedImage);
       }
       
     } catch (error) {
-      console.error('分镜提示词生成失败:', error);
+      console.error('分镜生成过程中发生错误:', error);
       
-      // 如果生成失败，使用默认分镜描述创建节点
+      // 如果生成失败，使用更专业的默认分镜描述创建节点
       const defaultScenes = node.data.generatedImage ? [
-        `${node.data.prompt} - 保持原图构图和主体`,
-        `${node.data.prompt} - 调整视角和角度`,
-        `${node.data.prompt} - 改变距离和焦点`,
-        `${node.data.prompt} - 展示细节和结果`
+        `${node.data.prompt} - 大远景低角度镜头，人物位于画面下方，展示环境空间，24mm广角，深景深，冷色调，硬朗侧光，电影感构图`,
+        `${node.data.prompt} - 面部特写镜头，三分法构图，眼神低垂，85mm中长焦，极浅景深，戏剧性光影，皮肤质感清晰`,
+        `${node.data.prompt} - 低角度特写镜头，仰拍人物侧脸，下颌线条紧绷，50mm标准镜头，逆光轮廓光，展现决心时刻`,
+        `${node.data.prompt} - 中远景平视镜头，人物背影走向深处，35mm广角，中等景深，光线呼应开场，余韵氛围`
       ] : [
-        `${node.data.prompt} - 远景全景`,
-        `${node.data.prompt} - 中景构图`,
-        `${node.data.prompt} - 近景特写`,
-        `${node.data.prompt} - 细节展示`
+        `${node.data.prompt} - 建立镜头：大远景展现环境与人物关系，低角度构图，冷青色调，硬朗侧光，24mm广角，深景深，孤寂氛围`,
+        `${node.data.prompt} - 发展镜头：面部特写，眼神低垂后缓慢闭上，85mm中长焦，极浅景深，戏剧性光影，呼吸声可闻`,
+        `${node.data.prompt} - 转折镜头：低角度仰拍，猛然睁眼，50mm标准镜头，逆光轮廓光，展现决心与力量`,
+        `${node.data.prompt} - 结局镜头：中远景，人物背影走向远方，35mm广角，中等景深，光线呼应开场，脚步声渐行渐远`
       ];
 
       if (window.topFlow && window.topFlow.createStoryboardNodes) {
