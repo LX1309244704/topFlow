@@ -2668,7 +2668,9 @@ export default function InfiniteCanvasApp() {
           nodes.forEach(n => { if (n.x < cR.x + cR.w && n.x + NODE_WIDTHS[n.type] > cR.x && n.y < cR.y + cR.h && n.y + getNodeHeight(n) > cR.y) s.add(n.id); });
           setSelectedIds(s);
       } else if (connecting) {
-          setMenu({ x: mousePos.x, y: mousePos.y, sourceId: connecting.nodeId });
+          // 获取源节点连接点的位置
+          const sourceNodePos = getHandlePosition(connecting.nodeId, 'source', nodes);
+          setMenu({ x: sourceNodePos.x + 20, y: sourceNodePos.y, sourceId: connecting.nodeId });
           setConnecting(null);
       }
       setDragState(null);
@@ -2677,6 +2679,10 @@ export default function InfiniteCanvasApp() {
   const onNodeSelect = useCallback((e, id) => {
       e.stopPropagation();
       if (['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      
+      // 检查是否点击在连接手柄上
+      const target = e.target;
+      if (target.closest('.absolute.w-6.h-6.flex.items-center.justify-center.cursor-crosshair')) return;
       
       let newSet;
       if (e.shiftKey) {

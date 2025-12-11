@@ -210,8 +210,14 @@ export const HandlePoint = React.memo(({ type, top, onMouseDown, onMouseUp }) =>
   <div 
     className={`absolute w-6 h-6 flex items-center justify-center cursor-crosshair z-[60] hover:scale-110 transition-transform ${type === 'source' ? '-right-5' : '-left-5'}`}
     style={{ top: top, marginTop: -12 }}
-    onMouseDown={onMouseDown}
-    onMouseUp={onMouseUp}
+    onMouseDown={(e) => {
+      e.stopPropagation();
+      if (onMouseDown) onMouseDown(e);
+    }}
+    onMouseUp={(e) => {
+      e.stopPropagation();
+      if (onMouseUp) onMouseUp(e);
+    }}
   >
     <div className={`w-3.5 h-3.5 rounded-full border-2 border-white shadow-md transition-colors duration-200 ${type === 'source' ? 'bg-blue-500' : 'bg-slate-400 hover:bg-blue-500'}`} />
   </div>

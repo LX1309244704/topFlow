@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
 import apiClient from '../api/client.js';
@@ -168,6 +168,18 @@ const GenerateButton = ({
 
 // 图片节点内容组件
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
+  // 分辨率选项 - 根据模型类型提供不同的分辨率选项
+  const resolutionOptions = {
+    "nano-banana": [
+      { value: "720p", label: "720P" }
+    ],
+    "nano-banana-pro": [
+      { value: "1k", label: "1K" },
+      { value: "2k", label: "2K" },
+      { value: "4k", label: "4K" }
+    ]
+  };
+
   const modelOptions = [
     { value: "nano-banana", label: "Nano Banana" },
     { value: "nano-banana-pro", label: "Nano Banana Pro" },
@@ -1063,8 +1075,14 @@ ${node.data.prompt}
             </div>
           </>
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
             <Mountain size={64} className="text-blue-200/80" />
+            <div 
+              className="text-xs text-blue-300 font-medium bg-blue-50/50 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+              onClick={() => !isDisabled && fileRef.current?.click()}
+            >
+              点击上传图片
+            </div>
           </div>
         )}
       </div>
@@ -1109,13 +1127,12 @@ ${node.data.prompt}
               data: {...node.data, batchSize: v} 
             })}
           />
-          <button 
-            onClick={() => !isDisabled && fileRef.current?.click()} 
-            disabled={isDisabled}
-            className={`p-1.5 ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-100'} rounded text-gray-400`}
-          >
-            <ImageIcon size={14}/>
-          </button>
+          <NodeSelect 
+            value={node.data.resolution || "720p"} 
+            options={resolutionOptions[node.data.model || "nano-banana"] || resolutionOptions["nano-banana"]} 
+            onChange={v => updateNode(node.id, { data: {...node.data, resolution: v} })} 
+            className="w-16" 
+          />
           <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload} />
         </BottomActionBar>
       </div>
