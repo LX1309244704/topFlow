@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
+import { DrawingCanvas } from './DrawingCanvas.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
 import apiClient from '../api/client.js';
 
@@ -168,6 +169,9 @@ const GenerateButton = ({
 
 // 图片节点内容组件
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
+  // 涂鸦相关状态
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+
   // 分辨率选项 - 根据模型类型提供不同的分辨率选项
   const resolutionOptions = {
     "nano-banana": [
@@ -238,6 +242,22 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
   const handleClearImage = () => {
     updateNode(node.id, { data: { ...node.data, generatedImage: null } });
+  };
+
+  // 涂鸦相关处理函数
+  const handleDrawingSave = (editedImage) => {
+    updateNode(node.id, { data: { ...node.data, generatedImage: editedImage } });
+    setIsDrawingMode(false);
+  };
+
+  const handleDrawingCancel = () => {
+    setIsDrawingMode(false);
+  };
+
+  const startDrawingMode = () => {
+    if (node.data.generatedImage) {
+      setIsDrawingMode(true);
+    }
   };
 
 
@@ -1066,12 +1086,25 @@ ${node.data.prompt}
           <>
             <img src={node.data.generatedImage} alt="Gen" className="w-full h-full object-cover select-none" draggable={false} onDragStart={(e) => e.preventDefault()} />
             <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-              <MediaActionButtons 
-                onDownload={() => handleDownload()}
-                onClear={() => handleClearImage()}
-                downloadTitle="下载图片"
-                clearTitle="清除图片"
-              />
+              <div className="flex gap-2">
+                {/* 涂鸦按钮 */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startDrawingMode();
+                  }}
+                  className="p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors hover:bg-white text-gray-700 cursor-pointer"
+                  title="涂鸦编辑"
+                >
+                  <Brush size={14} />
+                </button>
+                <MediaActionButtons 
+                  onDownload={() => handleDownload()}
+                  onClear={() => handleClearImage()}
+                  downloadTitle="下载图片"
+                  clearTitle="清除图片"
+                />
+              </div>
             </div>
           </>
         ) : (
@@ -1136,6 +1169,7 @@ ${node.data.prompt}
           <input type="file" ref={fileRef} className="hidden" onChange={handleImageUpload} />
         </BottomActionBar>
       </div>
+
 
 
     </>
@@ -1450,17 +1484,26 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
   );
 };
 
-// 视频节点内容组件
+// 视频节点内容组件 - 重新实现，确保上传按钮可见
 export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
   const videoModelOptions = [
-    {value:"svd",label:"Stable Video Diffusion"}, 
-    {value:"gen2",label:"Runway Gen-2"}, 
-    {value:"pika",label:"Pika Labs"}, 
-    {value:"luma",label:"Luma Dream Machine"}
+    {value:"sora2",label:"Sora 2.0"}, 
+    {value:"veo_3_1-fast",label:"veo_3_1-fast"}
   ];
   
+  const fileRef = useRef(null);
 
-  
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('video/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateNode(node.id, { data: { ...node.data, videoUrl: reader.result, uploadedVideo: true } });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleEnhance = async () => {
     if (!node.data.prompt) return;
     updateNode(node.id, { data: { ...node.data, isGenerating: true } });
@@ -1475,63 +1518,77 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   };
 
   const handleClearVideo = () => {
-    updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false } });
+    updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false, uploadedVideo: false } });
   };
 
-
-
+  const isDisabled = node.data.isGenerating;
   const imageCount = imageInputs.length;
-  let inputStatusText = imageCount === 0 ? '文生视频模式 (T2V)' : imageCount === 1 ? '参考图生视频模式 (I2V)' : `首尾帧生视频模式 (${imageCount} Refs)`;
-  let inputStatusColor = imageCount === 0 ? 'text-gray-500' : imageCount === 1 ? 'text-orange-500' : 'text-purple-500';
+  let inputStatusText;
+  let inputStatusColor;
+  
+  if (node.data.uploadedVideo) {
+    inputStatusText = '已上传视频';
+    inputStatusColor = 'text-green-500';
+  } else {
+    inputStatusText = imageCount === 0 ? '文生视频模式 (T2V)' : imageCount === 1 ? '参考图生视频模式 (I2V)' : `首尾帧生视频模式 (${imageCount} Refs)`;
+    inputStatusColor = imageCount === 0 ? 'text-gray-500' : imageCount === 1 ? 'text-orange-500' : 'text-purple-500';
+  }
 
   return (
     <>
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 16/9 }}>
+      {/* 视频显示区域 - 简化布局 */}
+      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 16/9 }}>
         {node.data.isGenerating ? (
           <GenerationIndicator text="AI Processing..." />
         ) : (
           <>
-            {/* 视频内容容器，确保不会覆盖按钮 */}
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              {node.data.videoUrl ? (
+            {/* 有视频时显示视频和操作按钮 */}
+            {node.data.videoUrl ? (
+              <>
                 <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
-              ) : (
-                node.data.generatedVideo ? 
-                  <Play size={48} className="text-blue-600 opacity-80" /> : 
-                  <Video size={64} className="text-blue-200/80" />
-              )}
-            </div>
-            {/* 操作按钮容器，始终可见，确保在最上层 */}
-            <div className="absolute bottom-2 right-2 z-50 flex gap-2">
-              {/* 下载按钮 - 只有有视频时才显示 */}
-              {node.data.videoUrl && (
-                <button 
-                  onClick={() => !node.data.isGenerating && handleDownload()} 
-                  disabled={node.data.isGenerating}
-                  className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                    node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-gray-700 cursor-pointer'
-                  }`} 
-                  title={node.data.isGenerating ? "正在生成，请稍候" : "下载视频"}
+                <div className="absolute bottom-2 right-2 z-50 flex gap-2">
+                  <button 
+                    onClick={() => !node.data.isGenerating && handleDownload()} 
+                    disabled={node.data.isGenerating}
+                    className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                      node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-gray-700 cursor-pointer'
+                    }`} 
+                    title={node.data.isGenerating ? "正在生成，请稍候" : "下载视频"}
+                  >
+                    <Download size={14} />
+                  </button>
+                  
+                  <button 
+                    onClick={() => !node.data.isGenerating && handleClearVideo()} 
+                    disabled={node.data.isGenerating}
+                    className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                      node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-red-500 cursor-pointer'
+                    }`} 
+                    title={node.data.isGenerating ? "正在生成，请稍候" : "清除视频"}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* 无视频时显示上传界面 - 使用与图片节点相同的样式 */
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                <Video size={64} className="text-blue-200/80" />
+                <div 
+                  className="text-xs text-blue-300 font-medium bg-blue-50/50 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                  onClick={() => !isDisabled && fileRef.current?.click()}
                 >
-                  <Download size={14} />
-                </button>
-              )}
-              
-              {/* 清除按钮 - 始终显示 */}
-              <button 
-                onClick={() => !node.data.isGenerating && handleClearVideo()} 
-                disabled={node.data.isGenerating}
-                className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                  node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-red-500 cursor-pointer'
-                }`} 
-                title={node.data.isGenerating ? "正在生成，请稍候" : "清除视频"}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
+                  点击上传视频
+                </div>
+              </div>
+            )}
+            {/* 文件输入元素 */}
+            <input type="file" ref={fileRef} className="hidden" accept="video/*,video/mp4,video/quicktime,video/x-msvideo,video/x-matroska" onChange={handleVideoUpload} />
           </>
         )}
       </div>
+
+      {/* 底部控制区域 */}
       <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-xs">
@@ -1542,7 +1599,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </div>
         
         <PromptInput 
-          value={node.data.prompt} 
+          value={node.data.prompt || ''} 
           onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} 
           placeholder="视频描述..." 
           onEnhance={handleEnhance}
@@ -1582,8 +1639,6 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           />
         </BottomActionBar>
       </div>
-
-
     </>
   );
 };
@@ -1811,6 +1866,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           </button>
         </div>
       </div>
+
 
 
     </>

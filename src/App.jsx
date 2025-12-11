@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
-import { AudioContent, TextContent, ImageContent } from './components/NodeContent.jsx';
+import { AudioContent, TextContent, ImageContent, VideoContent } from './components/NodeContent.jsx';
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 import { AssetModal, SaveProjectModal, ProjectMenu } from './components/Modals.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
@@ -201,113 +201,7 @@ const InputBadge = ({ text, type }) => {
 
 
 
-const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, videoInputs, generateText }) => {
-  const videoModelOptions = [
-    {value:"sora2",label:"Sora 2.0"}, 
-    {value:"veo_3_1-fast",label:"veo_3_1-fast"}
-  ];
-  
-  const handleEnhance = async () => {
-    if (!node.data.prompt) return;
-    updateNode(node.id, { data: { ...node.data, isGenerating: true } });
-    const enhanced = await generateText(`Rewrite this video generation prompt...: ${node.data.prompt}`);
-    updateNode(node.id, { data: { ...node.data, prompt: enhanced, isGenerating: false } });
-  };
-  
-  const handleDownload = () => {
-      if (node.data.videoUrl) {
-          downloadFile(node.data.videoUrl, `video-${node.id}.mp4`);
-      }
-  };
 
-  const handleClearVideo = () => {
-      updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false, errorMessage: null } });
-  };
-
-  const imageCount = imageInputs.length;
-  const videoCount = videoInputs.length;
-  const currentModel = node.data.model || 'sora2';
-  
-  // 根据不同模型显示不同的输入状态
-  let inputStatusText = '文生视频模式 (T2V)';
-  let inputStatusColor = 'text-gray-500';
-  
-  if (videoCount > 0) {
-    // 视频节点连接模式：提取最后一帧作为首帧
-    inputStatusText = `视频续帧模式 (${videoCount} 视频)`;
-    inputStatusColor = 'text-green-500';
-  } else if (currentModel === 'veo_3_1-fast' && imageCount === 2) {
-    inputStatusText = '首尾帧生视频模式 (首尾帧)';
-    inputStatusColor = 'text-purple-500';
-  } else if (currentModel === 'veo3.1-components' && imageCount <= 3 && imageCount > 0) {
-    inputStatusText = `veo3.1多参考图 (${imageCount} 参考图)`;
-    inputStatusColor = 'text-indigo-500';
-  } else if (imageCount === 1) {
-    inputStatusText = '参考图生视频模式 (I2V)';
-    inputStatusColor = 'text-orange-500';
-  } else if (imageCount > 1) {
-    inputStatusText = `多图生视频模式 (${imageCount} Refs)`;
-    inputStatusColor = 'text-purple-500';
-  }
-
-  return (
-    <>
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 4/3 }}>
-        {node.data.isGenerating ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"/><span className="text-xs text-blue-600 font-bold animate-pulse">AI Processing...</span></div>
-        ) : node.data.errorMessage ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-50/50 backdrop-blur-sm">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-2">
-              <X size={24} className="text-red-500" />
-            </div>
-            <span className="text-xs text-red-600 font-bold text-center px-2">{node.data.errorMessage}</span>
-            <button onClick={(e) => { e.stopPropagation(); handleClearVideo(); }} className="mt-2 text-xs text-red-500 hover:text-red-700 underline">清除错误</button>
-          </div>
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center group">
-              {node.data.videoUrl ? (
-                  <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
-              ) : (
-                   node.data.generatedVideo ? <Play size={48} className="text-blue-600 opacity-80" /> : <Video size={64} className="text-blue-200/80" />
-              )}
-              {(node.data.videoUrl || node.data.generatedVideo) && !node.data.isGenerating && (
-                <div className="absolute bottom-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    {node.data.videoUrl && (
-                        <button onClick={(e) => { e.stopPropagation(); handleDownload(); }} className="p-1.5 bg-white/80 hover:bg-white text-gray-700 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="下载视频"><Download size={14} /></button>
-                    )}
-                    <button onClick={(e) => { e.stopPropagation(); handleClearVideo(); }} className="p-1.5 bg-white/80 hover:bg-white text-red-500 rounded-full shadow-sm backdrop-blur-sm transition-colors" title="清除视频"><Trash2 size={14} /></button>
-                </div>
-              )}
-          </div>
-        )}
-      </div>
-      <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
-        <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2 text-xs"><LinkIcon size={12} className={inputStatusColor} /><span className={`font-semibold ${inputStatusColor}`}>{inputStatusText}</span></div>
-            {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
-        </div>
-        <div className="relative">
-            <textarea className="w-full text-sm bg-transparent border border-gray-100 rounded-lg p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" placeholder="视频描述..." rows={2} value={node.data.prompt} onChange={e => updateNode(node.id, { data: { ...node.data, prompt: e.target.value } })} onMouseDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}/>
-            <button onClick={handleEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors"><Wand2 size={14} /></button>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-           <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1"/>
-        </div>
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50 w-full">
-           <div className="flex gap-1.5">
-              <NodeSelect value={node.data.ratio || "16:9"} options={[{value:"16:9",label:"16:9"}, {value:"9:16",label:"9:16"}]} icon={Square} onChange={v => { const [w, h] = v.split(':').map(Number); updateNode(node.id, { data: {...node.data, ratio: v, aspectRatio: w/h} }); }} className="w-18"/>
-              <NodeSelect value={node.data.duration || 10} options={node.data.model === 'veo_3_1-fast' ? [{value:8,label:"8秒"}] : [{value:10,label:"10秒"}, {value:15,label:"15秒"}]} icon={Clock} onChange={v => {
-                const newDuration = parseInt(v);
-                updateNode(node.id, { data: {...node.data, duration: newDuration} });
-              }} className="w-18"/>
-               <NodeSelect value={node.data.batchSize || 1} options={[{value:1,label:"1x"}, {value:2,label:"2x"}]} icon={Layers} onChange={v => updateNode(node.id, { data: {...node.data, batchSize: parseInt(v)} })} className="w-16"/>
-           </div>
-           <button onClick={handleGenerate} className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95 ml-auto"><Zap size={12} className="fill-white"/>生成</button>
-        </div>
-      </div>
-    </>
-  );
-};
 
 
 
