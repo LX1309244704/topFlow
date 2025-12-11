@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { DrawingCanvas } from './DrawingCanvas.jsx';
+import { FrameCropper } from './FrameCropper.jsx';
 import { downloadFile, NODE_WIDTHS } from '../constants.js';
 import apiClient from '../api/client.js';
 
@@ -1170,7 +1171,15 @@ ${node.data.prompt}
         </BottomActionBar>
       </div>
 
-
+      {isDrawingMode && createPortal(
+        <DrawingCanvas
+          isVisible={isDrawingMode}
+          onCancel={handleDrawingCancel}
+          onSave={handleDrawingSave}
+          imageSrc={node.data.generatedImage}
+        />,
+        document.body
+      )}
 
     </>
   );
@@ -1492,6 +1501,12 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   ];
   
   const fileRef = useRef(null);
+  const videoRef = useRef(null);
+  const [showSceneDirector, setShowSceneDirector] = useState(false);
+  const [capturedFrame, setCapturedFrame] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   const handleVideoUpload = (e) => {
     const file = e.target.files[0];
@@ -1519,6 +1534,85 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
   const handleClearVideo = () => {
     updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false, uploadedVideo: false } });
+    setCapturedFrame(null);
+    setShowSceneDirector(false);
+    setShowCropper(false);
+  };
+
+  // Scene Director Handlers
+  const toggleSceneDirector = () => {
+    if (showSceneDirector) {
+      setShowSceneDirector(false);
+      setCapturedFrame(null);
+      setShowCropper(false);
+    } else {
+      setShowSceneDirector(true);
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
+    }
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleSeek = (e) => {
+    const time = parseFloat(e.target.value);
+    if (videoRef.current) {
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+    }
+  };
+
+  const captureCurrentFrame = () => {
+    if (videoRef.current) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/png');
+      setCapturedFrame(dataUrl);
+      setShowCropper(true); // Open Cropper immediately
+      videoRef.current.pause();
+    }
+  };
+
+  const handleCropConfirm = (croppedImage) => {
+    // 设置最终图片
+    setCapturedFrame(croppedImage);
+    
+    // 关闭裁剪和时间轴模块，但保留截图显示
+    setShowCropper(false);
+    setShowSceneDirector(false);
+    
+    // 提示
+    // alert("局部分镜已截取，请在右上角确认使用。");
+  };
+
+  const handleUseCapturedFrame = () => {
+    // 确认使用当前截取的帧（可能是已经裁剪过的）
+    alert("局部分镜功能：已确认使用此分镜。");
+    
+    // 关闭预览和截取状态
+    setCapturedFrame(null);
+    // 可选：如果希望使用后直接退出局部分镜模式，可以取消注释下面这行
+    // setShowSceneDirector(false);
+  };
+
+  const formatTime = (time) => {
+    const minutes = Math.floor(time / 60);
+    const seconds = Math.floor(time % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   const isDisabled = node.data.isGenerating;
@@ -1545,30 +1639,131 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             {/* 有视频时显示视频和操作按钮 */}
             {node.data.videoUrl ? (
               <>
-                <video src={node.data.videoUrl} controls className="w-full h-full object-cover" />
-                <div className="absolute bottom-2 right-2 z-50 flex gap-2">
-                  <button 
-                    onClick={() => !node.data.isGenerating && handleDownload()} 
-                    disabled={node.data.isGenerating}
-                    className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                      node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-gray-700 cursor-pointer'
-                    }`} 
-                    title={node.data.isGenerating ? "正在生成，请稍候" : "下载视频"}
-                  >
-                    <Download size={14} />
-                  </button>
-                  
-                  <button 
-                    onClick={() => !node.data.isGenerating && handleClearVideo()} 
-                    disabled={node.data.isGenerating}
-                    className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                      node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-red-500 cursor-pointer'
-                    }`} 
-                    title={node.data.isGenerating ? "正在生成，请稍候" : "清除视频"}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                <video 
+                  ref={videoRef}
+                  src={node.data.videoUrl} 
+                  controls={!showSceneDirector} // 启用Scene Director时隐藏原生控件
+                  className="w-full h-full object-cover" 
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleLoadedMetadata}
+                />
+                
+                {/* 截取的帧预览 - 悬浮在右上角 */}
+                {capturedFrame && !showCropper && (
+                  <div className="absolute top-4 right-4 w-32 aspect-video border-2 border-purple-500 rounded-lg overflow-hidden shadow-2xl z-50 bg-black animate-in fade-in zoom-in duration-300 group/preview">
+                    <img src={capturedFrame} alt="Captured" className="w-full h-full object-contain" />
+                    
+                    {/* 关闭按钮 - 常驻右上角 */}
+                    <button 
+                        onClick={() => setCapturedFrame(null)}
+                        className="absolute top-1 right-1 bg-black/50 text-white p-0.5 rounded-full hover:bg-red-500 transition-colors opacity-0 group-hover/preview:opacity-100"
+                        title="关闭"
+                      >
+                        <X size={12} />
+                    </button>
+
+                    <div className="absolute inset-0 bg-black/20 hover:bg-black/0 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 gap-2">
+                      <button 
+                        onClick={() => setShowCropper(true)}
+                        className="bg-white text-black p-1 rounded-full hover:bg-gray-200"
+                        title="重新裁剪"
+                      >
+                        <Crop size={16} />
+                      </button>
+                      <button 
+                        onClick={handleUseCapturedFrame}
+                        className="bg-purple-600 text-white p-1 rounded-full hover:bg-purple-700"
+                        title="使用此帧"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scene Director Timeline - 底部滑出 */}
+                {showSceneDirector && (
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-3 z-40 animate-in slide-in-from-bottom duration-300 border-t border-white/10">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center text-white/80 text-[10px] font-mono mb-1">
+                        <span>Scene Director Timeline</span>
+                        <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause()}
+                          className="text-white hover:text-blue-400 transition-colors"
+                        >
+                          {videoRef.current && !videoRef.current.paused ? <div className="w-3 h-3 bg-white rounded-sm" /> : <Play size={14} fill="currentColor" />}
+                        </button>
+                        
+                        <input
+                          type="range"
+                          min="0"
+                          max={duration || 100}
+                          value={currentTime}
+                          onChange={handleSeek}
+                          className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125"
+                        />
+                        
+                        <button 
+                          onClick={captureCurrentFrame}
+                          className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs transition-colors"
+                        >
+                          <Scissors size={12} />
+                          <span>截取</span>
+                        </button>
+                        
+                        <button 
+                          onClick={toggleSceneDirector}
+                          className="text-white/50 hover:text-white transition-colors ml-2"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 常规操作按钮 - 当Scene Director激活时隐藏 */}
+                {!showSceneDirector && (
+                  <div className="absolute bottom-2 right-2 z-50 flex gap-2">
+                    {/* Scene Director 按钮 */}
+                    <button 
+                      onClick={toggleSceneDirector}
+                      disabled={node.data.isGenerating}
+                      className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-purple-600 cursor-pointer'
+                      }`} 
+                      title="局部分镜 (Scene Director)"
+                    >
+                      <Film size={14} />
+                    </button>
+
+                    <button 
+                      onClick={() => !node.data.isGenerating && handleDownload()} 
+                      disabled={node.data.isGenerating}
+                      className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-gray-700 cursor-pointer'
+                      }`} 
+                      title={node.data.isGenerating ? "正在生成，请稍候" : "下载视频"}
+                    >
+                      <Download size={14} />
+                    </button>
+                    
+                    <button 
+                      onClick={() => !node.data.isGenerating && handleClearVideo()} 
+                      disabled={node.data.isGenerating}
+                      className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-red-500 cursor-pointer'
+                      }`} 
+                      title={node.data.isGenerating ? "正在生成，请稍候" : "清除视频"}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
               </>
             ) : (
               /* 无视频时显示上传界面 - 使用与图片节点相同的样式 */
@@ -1587,6 +1782,16 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           </>
         )}
       </div>
+
+      {/* Frame Cropper Portal */}
+      {showCropper && capturedFrame && createPortal(
+        <FrameCropper
+          imageSrc={capturedFrame}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setShowCropper(false)}
+        />,
+        document.body
+      )}
 
       {/* 底部控制区域 */}
       <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>

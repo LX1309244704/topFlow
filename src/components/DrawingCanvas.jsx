@@ -220,119 +220,22 @@ export const DrawingCanvas = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-80 z-[999] flex items-center justify-center p-8"
-      onMouseDown={onCancel}
-      onTouchStart={onCancel}
+      className="fixed inset-0 bg-black z-[9999] flex flex-col items-center justify-center animate-in fade-in duration-200"
     >
-      <div 
-        className="bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden" 
-        style={{ 
-          width: 'auto',
-          height: 'auto',
-          maxWidth: '90vw',
-          maxHeight: '90vh'
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-        onTouchStart={(e) => e.stopPropagation()}
-      >
-        {/* 工具栏 */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-2">
-            {/* 工具选择 */}
-            <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setCurrentTool('pen')}
-                className={`p-2 rounded transition-colors ${
-                  currentTool === 'pen' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-                }`}
-                title="画笔"
-              >
-                <Brush size={16} />
-              </button>
-              <button
-                onClick={() => setCurrentTool('eraser')}
-                className={`p-2 rounded transition-colors ${
-                  currentTool === 'eraser' ? 'bg-white shadow-sm' : 'hover:bg-gray-200'
-                }`}
-                title="橡皮擦"
-              >
-                <Eraser size={16} />
-              </button>
-            </div>
-
-            {/* 颜色选择 */}
-            {currentTool === 'pen' && (
-              <div className="flex items-center gap-2 ml-4">
-                <Palette size={16} className="text-gray-600" />
-                <div className="flex gap-1">
-                  {colors.map(color => (
-                    <button
-                      key={color}
-                      onClick={() => setCurrentColor(color)}
-                      className={`w-6 h-6 rounded border-2 transition-transform ${
-                        currentColor === color ? 'border-blue-500 scale-110' : 'border-gray-300'
-                      }`}
-                      style={{ backgroundColor: color }}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 画笔大小 */}
-            <div className="flex items-center gap-2 ml-4">
-              <span className="text-sm text-gray-600">大小:</span>
-              <div className="flex gap-1">
-                {brushSizes.map(size => (
-                  <button
-                    key={size}
-                    onClick={() => setBrushSize(size)}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
-                      brushSize === size ? 'bg-blue-500 text-white' : 'bg-gray-100 hover:bg-gray-200'
-                    }`}
-                  >
-                    {size}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 撤销按钮 */}
-            <button
-              onClick={undo}
-              disabled={historyStep <= 0}
-              className="p-2 rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              title="撤销"
-            >
-              <RotateCcw size={16} />
-            </button>
-          </div>
-
-          {/* 操作按钮 */}
-          <div className="flex gap-2">
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              <Download size={16} />
-              保存
-            </button>
-            <button
-              onClick={onCancel}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-            >
-              <X size={16} />
-              取消
-            </button>
-          </div>
+      {/* Top Bar */}
+      <div className="absolute top-0 left-0 right-0 p-4 z-50 flex flex-col items-center pointer-events-none">
+        <div className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 mb-2">
+            <Brush size={14} className="text-blue-400" />
+            <span className="text-white text-sm font-medium">涂鸦编辑</span>
         </div>
+      </div>
 
-        {/* 画布区域 */}
-        <div className="flex-1 bg-gray-50 flex items-center justify-center p-8">
-          <div className="relative bg-white p-4 rounded-lg shadow-inner">
+      {/* Canvas Area */}
+      <div className="relative w-full h-full p-8 flex items-center justify-center overflow-hidden bg-black">
+        <div className="relative select-none max-w-full max-h-full flex items-center justify-center">
             <canvas
               ref={canvasRef}
-              className="border border-gray-300 rounded cursor-crosshair"
+              className="cursor-crosshair shadow-2xl"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 startDrawing(e);
@@ -361,14 +264,104 @@ export const DrawingCanvas = ({
                 e.stopPropagation();
                 handleTouchEnd(e);
               }}
-              style={{ touchAction: 'none', maxWidth: '100%', maxHeight: '100%' }}
+              style={{ touchAction: 'none', maxWidth: '90vw', maxHeight: '80vh' }}
             />
-          </div>
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
+      <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-6 z-50 flex flex-col items-center gap-4">
+        {/* Tools */}
+        <div className="flex items-center gap-4 p-2 bg-white/10 rounded-xl overflow-x-auto max-w-full">
+            {/* Tool Selection */}
+            <div className="flex gap-1 bg-black/40 rounded-lg p-1">
+              <button
+                onClick={() => setCurrentTool('pen')}
+                className={`p-2 rounded transition-colors ${
+                  currentTool === 'pen' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+                title="画笔"
+              >
+                <Brush size={18} />
+              </button>
+              <button
+                onClick={() => setCurrentTool('eraser')}
+                className={`p-2 rounded transition-colors ${
+                  currentTool === 'eraser' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'
+                }`}
+                title="橡皮擦"
+              >
+                <Eraser size={18} />
+              </button>
+            </div>
+
+            <div className="w-px h-8 bg-white/20 mx-1" />
+
+            {/* Colors */}
+            {currentTool === 'pen' && (
+                <div className="flex gap-1.5 items-center">
+                  {colors.map(color => (
+                    <button
+                      key={color}
+                      onClick={() => setCurrentColor(color)}
+                      className={`w-6 h-6 rounded-full transition-transform ${
+                        currentColor === color ? 'scale-125 ring-2 ring-white ring-offset-2 ring-offset-black' : 'hover:scale-110'
+                      }`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+            )}
+            
+            <div className="w-px h-8 bg-white/20 mx-1" />
+
+            {/* Brush Size */}
+            <div className="flex gap-1 items-center">
+                {brushSizes.map(size => (
+                  <button
+                    key={size}
+                    onClick={() => setBrushSize(size)}
+                    className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
+                      brushSize === size ? 'bg-white/20 text-white' : 'text-gray-500 hover:text-gray-300'
+                    }`}
+                  >
+                    <div 
+                        className="rounded-full bg-current"
+                        style={{ width: Math.max(2, size), height: Math.max(2, size) }}
+                    />
+                  </button>
+                ))}
+            </div>
+
+            <div className="w-px h-8 bg-white/20 mx-1" />
+
+            {/* Undo */}
+            <button
+              onClick={undo}
+              disabled={historyStep <= 0}
+              className="p-2 rounded text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="撤销"
+            >
+              <RotateCcw size={18} />
+            </button>
         </div>
 
-        {/* 提示信息 */}
-        <div className="p-2 bg-gray-100 text-center text-sm text-gray-600">
-          使用鼠标或触摸屏在图片上绘制 • 选择工具和颜色进行涂鸦 • 点击保存应用更改
+        {/* Actions */}
+        <div className="flex gap-4">
+            <button 
+                onClick={onCancel}
+                className="px-6 py-2 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors flex items-center gap-2"
+            >
+                <X size={16} />
+                取消
+            </button>
+            <button 
+                onClick={handleSave}
+                className="px-6 py-2 rounded-full bg-white text-black text-sm font-bold hover:bg-gray-200 transition-colors flex items-center gap-2"
+            >
+                <Download size={16} />
+                保存
+            </button>
         </div>
       </div>
     </div>
