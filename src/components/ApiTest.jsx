@@ -111,7 +111,7 @@ const ApiTest = () => {
         {/* 文本生成测试 */}
         <div className="p-4 border border-gray-200 rounded-lg">
           <div className="flex items-center mb-3">
-            <FileText className="text-blue-500 mr-2" size={20} />
+            <FileText className="text-zinc-900 mr-2" size={20} />
             <h3 className="font-semibold">文本生成</h3>
           </div>
           <textarea
@@ -145,7 +145,7 @@ const ApiTest = () => {
         {/* 图像生成测试 */}
         <div className="p-4 border border-gray-200 rounded-lg">
           <div className="flex items-center mb-3">
-            <ImageIcon className="text-blue-500 mr-2" size={20} />
+            <ImageIcon className="text-zinc-900 mr-2" size={20} />
             <h3 className="font-semibold">图像生成</h3>
           </div>
           <textarea
@@ -210,7 +210,7 @@ const ApiTest = () => {
         {/* 语音合成测试 */}
         <div className="p-4 border border-gray-200 rounded-lg">
           <div className="flex items-center mb-3">
-            <Mic className="text-blue-500 mr-2" size={20} />
+            <Mic className="text-zinc-900 mr-2" size={20} />
             <h3 className="font-semibold">语音合成</h3>
           </div>
           <textarea
@@ -244,7 +244,7 @@ const ApiTest = () => {
         {/* 结构化文本生成测试 */}
         <div className="p-4 border border-gray-200 rounded-lg">
           <div className="flex items-center mb-3">
-            <Video className="text-blue-500 mr-2" size={20} />
+            <Video className="text-zinc-900 mr-2" size={20} />
             <h3 className="font-semibold">剧本分析</h3>
           </div>
           <p className="text-sm text-gray-600 mb-2">测试结构化文本生成，分析剧本概要、角色和关键场景</p>

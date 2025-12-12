@@ -24,8 +24,8 @@ const MediaActionButtons = ({
         <button 
           onClick={isDisabled ? undefined : onDownload} 
           disabled={isDisabled}
-          className={`p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors ${
-            isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white text-gray-700 cursor-pointer'
+          className={`p-1.5 bg-zinc-900/80 rounded-full shadow-sm backdrop-blur-sm transition-colors ${
+            isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-zinc-800 text-zinc-300 cursor-pointer'
           }`} 
           title={isDisabled ? "正在生成，请稍候" : downloadTitle}
         >
@@ -35,8 +35,8 @@ const MediaActionButtons = ({
       <button 
         onClick={isDisabled ? undefined : onClear} 
         disabled={isDisabled}
-        className={`p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors ${
-          isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-white text-red-500 cursor-pointer'
+        className={`p-1.5 bg-zinc-900/80 rounded-full shadow-sm backdrop-blur-sm transition-colors ${
+          isDisabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-zinc-800 text-red-400 cursor-pointer'
         }`} 
         title={isDisabled ? "正在生成，请稍候" : clearTitle}
       >
@@ -47,17 +47,18 @@ const MediaActionButtons = ({
 };
 
 // 共用的生成状态指示器组件
-const GenerationIndicator = ({ text, color = "blue" }) => {
+const GenerationIndicator = ({ text, color = "black" }) => {
   const colorClasses = {
-    blue: "border-blue-500 text-blue-600",
-    green: "border-green-500 text-green-600",
-    purple: "border-purple-500 text-purple-600",
+    blue: "border-zinc-700 text-zinc-300",
+    green: "border-zinc-600 text-zinc-300",
+    purple: "border-zinc-500 text-zinc-300",
+    black: "border-zinc-100 text-zinc-100",
   };
   
-  const spinnerColor = colorClasses[color] || colorClasses.blue;
+  const spinnerColor = colorClasses[color] || colorClasses.black;
   
   return (
-    <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
+    <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 backdrop-blur-sm z-50">
       <div className={`w-8 h-8 border-4 border-t-transparent rounded-full animate-spin mb-2 ${spinnerColor}`} />
       <span className={`text-xs font-bold animate-pulse ${spinnerColor}`}>{text}</span>
     </div>
@@ -76,7 +77,7 @@ const PromptInput = ({
 }) => (
   <div className="relative">
     <textarea 
-      className="w-full text-sm bg-transparent border border-gray-100 rounded-md p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none pr-8" 
+      className="w-full text-sm bg-transparent border border-zinc-800 rounded-md p-2 focus:ring-1 focus:ring-zinc-700 outline-none resize-none pr-8 text-zinc-300 placeholder-zinc-600" 
       placeholder={placeholder} 
       rows={rows} 
       value={value} 
@@ -84,7 +85,7 @@ const PromptInput = ({
       onMouseDown={onMouseDown} 
       onWheel={onWheel} 
     />
-    <button onClick={onEnhance} className="absolute right-2 top-2 text-purple-400 hover:text-purple-600 transition-colors">
+    <button onClick={onEnhance} className="absolute right-2 top-2 text-zinc-500 hover:text-zinc-300 transition-colors">
       <Wand2 size={14} />
     </button>
   </div>
@@ -96,7 +97,7 @@ const BottomActionBar = ({
   actionButton, 
   showBorder = true 
 }) => (
-  <div className={`flex justify-between items-center ${showBorder ? 'pt-2 border-t border-gray-50 w-full' : ''}`}>
+  <div className={`flex justify-between items-center ${showBorder ? 'pt-2 border-t border-zinc-800 w-full' : ''}`}>
     <div className="flex gap-1.5">
       {children}
     </div>
@@ -142,13 +143,13 @@ const GenerateButton = ({
   text = "生成", 
   isDisabled = false,
   color = "black",
-  icon = <Wand2 size={10} className="fill-white" />
+  icon = <Wand2 size={10} className="fill-zinc-900" />
 }) => {
   const colorClasses = {
-    black: "bg-black text-white hover:bg-gray-800",
-    blue: "bg-blue-600 text-white hover:bg-blue-700",
-    green: "bg-green-600 text-white hover:bg-green-700",
-    purple: "bg-purple-600 text-white hover:bg-purple-700",
+    black: "bg-zinc-100 text-zinc-900 hover:bg-white",
+    blue: "bg-zinc-100 text-zinc-900 hover:bg-white",
+    green: "bg-zinc-100 text-zinc-900 hover:bg-white",
+    purple: "bg-zinc-100 text-zinc-900 hover:bg-white",
   };
   
   const buttonColor = colorClasses[color] || colorClasses.black;
@@ -157,12 +158,13 @@ const GenerateButton = ({
     <button 
       onClick={isDisabled ? undefined : onClick} 
       disabled={isDisabled}
-      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-        isDisabled ? 'cursor-not-allowed opacity-50' : 
+      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-300 ${
+        isDisabled ? `cursor-not-allowed ${buttonColor} opacity-90` : 
         `${buttonColor} hover:shadow-lg active:scale-95`
       }`}
     >
-      {icon}
+      {isDisabled && <RefreshCw size={10} className="animate-spin" />}
+      {!isDisabled && icon}
       {text}
     </button>
   );
@@ -1083,12 +1085,12 @@ ${node.data.prompt}
 
   return (
     <>
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: currentAspect }}>
+      <div className={`relative w-full bg-zinc-950 border-x border-t border-zinc-800 overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} group ${isExpanded ? 'rounded-t-lg' : 'rounded-lg border-b'}`} style={{ aspectRatio: currentAspect }}>
         {/* 分镜生成中的源节点状态显示 */}
         {isModeSource && isModeGenerating && currentMode === 'storyboard' ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-purple-50/50 backdrop-blur-sm z-10">
-            <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin mb-2" />
-            <span className="text-xs text-purple-600 font-bold animate-pulse">生成分镜中...</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 backdrop-blur-sm z-10">
+            <div className="w-8 h-8 border-4 border-zinc-100 border-t-transparent rounded-full animate-spin mb-2" />
+            <span className="text-xs text-zinc-100 font-bold animate-pulse">生成分镜中...</span>
           </div>
         ) : node.data.isGenerating ? (
           <GenerationIndicator text="Generating..." />
@@ -1101,7 +1103,7 @@ ${node.data.prompt}
             
             {/* 涂鸦预览 - 悬浮在右上角 (仿照视频节点) */}
             {node.data.doodleImage && (
-              <div className="absolute top-4 right-4 w-1/3 max-w-[120px] aspect-square border-2 border-purple-500 rounded-lg overflow-hidden shadow-2xl z-20 bg-black animate-in fade-in zoom-in duration-300 group/preview">
+              <div className="absolute top-4 right-4 w-1/3 max-w-[120px] aspect-square border-2 border-zinc-500 rounded-lg overflow-hidden shadow-2xl z-20 bg-black animate-in fade-in zoom-in duration-300 group/preview">
                 <img src={node.data.doodleImage} alt="Doodle" className="w-full h-full object-cover block" />
                 
                 {/* 关闭按钮 */}
@@ -1139,7 +1141,7 @@ ${node.data.prompt}
                     e.stopPropagation();
                     startDrawingMode(true); // 始终编辑原图，创建新的涂鸦
                   }}
-                  className="p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors hover:bg-white text-gray-700 cursor-pointer"
+                  className="p-1.5 bg-zinc-900/80 rounded-full shadow-sm backdrop-blur-sm transition-colors hover:bg-zinc-800 text-zinc-300 cursor-pointer"
                   title="编辑原图"
                 >
                   <Brush size={14} />
@@ -1155,9 +1157,9 @@ ${node.data.prompt}
           </>
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-            <Mountain size={64} className="text-blue-200/80" />
+            <ImageIcon size={48} className="text-zinc-700" />
             <div 
-              className="text-xs text-blue-300 font-medium bg-blue-50/50 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+              className="text-xs text-zinc-400 font-medium bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800 cursor-pointer hover:bg-zinc-800 transition-colors shadow-sm"
               onClick={() => !isDisabled && fileRef.current?.click()}
             >
               点击上传图片
@@ -1165,7 +1167,7 @@ ${node.data.prompt}
           </div>
         )}
       </div>
-      <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
+      <div className={`bg-zinc-950 shadow-md border-x border-b border-zinc-800 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-lg opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-lg'}`} style={{ overflow: 'hidden' }}>
         {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
         
         <PromptInput 
@@ -1451,9 +1453,9 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
 
 
   return (
-    <div ref={textContentRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col cursor-text relative" onClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ height: `${currentHeight}px`, minHeight: `${minHeight}px` }}>
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border-b border-gray-100">
-        <div className="text-xs text-gray-500 font-medium">模型:</div>
+    <div ref={textContentRef} className="bg-zinc-950 rounded-lg shadow-md border border-zinc-800 overflow-hidden flex flex-col cursor-text relative" onClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} style={{ height: `${currentHeight}px`, minHeight: `${minHeight}px` }}>
+      <div className="flex items-center gap-2 px-3 py-2 bg-zinc-950 border-b border-zinc-800">
+        <div className="text-xs text-zinc-400 font-medium">模型:</div>
         <NodeSelect 
           value={node.data.model || "gemini-2.5"} 
           options={textModelOptions} 
@@ -1463,8 +1465,8 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
       </div>
       
       {/* 角色设置区域 */}
-      <div className="px-3 py-2 border-b border-gray-100 bg-gray-50">
-        <div className="text-xs text-gray-500 font-medium mb-2">角色设定:</div>
+      <div className="px-3 py-2 border-b border-zinc-800 bg-zinc-950">
+        <div className="text-xs text-zinc-400 font-medium mb-2">角色设定:</div>
         <div className="flex items-center gap-2">
           <NodeSelect 
             value={node.data.selectedRole || ""} 
@@ -1484,9 +1486,9 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
         </div>
       </div>
       
-      <div className="flex-1 p-4 relative group">
+      <div className="flex-1 p-3 relative group">
         <textarea 
-          className="w-full h-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0 leading-relaxed placeholder-gray-300" 
+          className="w-full h-full text-sm bg-transparent border-none outline-none resize-none p-0 focus:ring-0 leading-relaxed placeholder-zinc-600 text-zinc-300" 
           placeholder="输入剧本..." 
           value={(() => {
             const baseText = node.data.text || '';
@@ -1502,18 +1504,18 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
           readOnly={isWriting}
         />
         {isWriting && (
-          <div className="absolute bottom-2 left-4 text-xs text-blue-500 animate-pulse">
+          <div className="absolute bottom-2 left-4 text-xs text-zinc-500 animate-pulse">
             正在生成内容...
           </div>
         )}
         <div className="absolute bottom-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={handleAnalysisClick} className="bg-purple-50 text-purple-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-purple-100 disabled:opacity-50" disabled={isAiWorking}>
+          <button onClick={handleAnalysisClick} className="bg-zinc-800 text-zinc-300 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-zinc-700 disabled:opacity-50" disabled={isAiWorking}>
             {isAnalyzing ? 
               <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 分析中...</span> : 
               <span className="flex items-center gap-1"><Search size={10}/> 生成大纲</span>
             }
           </button>
-          <button onClick={handleAIWrite} className="bg-blue-50 text-blue-600 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-blue-100 disabled:opacity-50" disabled={isAiWorking}>
+          <button onClick={handleAIWrite} className="bg-zinc-800 text-zinc-300 px-2 py-1 rounded-lg text-xs font-medium flex items-center gap-1 hover:bg-zinc-700 disabled:opacity-50" disabled={isAiWorking}>
             {isWriting ? 
               <span className="flex items-center gap-1"><RefreshCw size={10} className="animate-spin"/> 生成中...</span> : 
               <span className="flex items-center gap-1"><Sparkles size={10}/> AI 生成</span>
@@ -1521,9 +1523,9 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
           </button>
         </div>
       </div>
-      <div className="bg-gray-50 px-3 py-2 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400 rounded-b-2xl">
+      <div className="bg-zinc-900 px-3 py-2 border-t border-zinc-800 flex justify-between items-center text-xs text-zinc-500 rounded-b-2xl">
         <span>{(node.data.text?.length || 0) + (node.data.streamingText?.length || 0)} 字符</span>
-        <div className="absolute right-0 bottom-0 w-4 h-4 cursor-ns-resize z-10 text-gray-400 hover:text-blue-500 flex items-center justify-center transition-colors"
+        <div className="absolute right-0 bottom-0 w-4 h-4 cursor-ns-resize z-10 text-zinc-500 hover:text-zinc-300 flex items-center justify-center transition-colors"
           onMouseDown={(e) => { 
             e.stopPropagation(); 
             textContentRef.current.initialY = e.clientY; 
@@ -1831,7 +1833,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   
   if (node.data.uploadedVideo) {
     inputStatusText = '已上传视频';
-    inputStatusColor = 'text-green-500';
+    inputStatusColor = 'text-zinc-600';
   } else {
     if (activeReferenceImages.length === 0) {
       inputStatusText = '文生视频模式 (T2V)';
@@ -1850,14 +1852,14 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         inputStatusText += ` (忽略后${referenceImages.length - maxImages}张)`;
       }
       
-      inputStatusColor = activeReferenceImages.length === 1 ? 'text-orange-500' : 'text-purple-500';
+      inputStatusColor = activeReferenceImages.length === 1 ? 'text-zinc-500' : 'text-zinc-900';
     }
   }
 
   return (
     <>
       {/* 视频显示区域 - 简化布局 */}
-      <div className={`relative w-full bg-[#dbeafe] border overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} shadow-sm group ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`} style={{ aspectRatio: node.data.aspectRatio || 16/9 }}>
+      <div className={`relative w-full bg-zinc-950 border-x border-t border-zinc-800 overflow-hidden transition-all duration-300 ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} group ${isExpanded ? 'rounded-t-lg' : 'rounded-lg border-b'}`} style={{ aspectRatio: node.data.aspectRatio || 16/9 }}>
         {node.data.isGenerating ? (
           <GenerationIndicator text="AI Processing..." />
         ) : (
@@ -1876,7 +1878,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                 
                 {/* 截取的帧预览 - 悬浮在右上角 */}
                 {capturedFrame && !showCropper && (
-                  <div className="absolute top-4 right-4 w-32 h-auto border-2 border-purple-500 rounded-lg overflow-hidden shadow-2xl z-50 bg-black animate-in fade-in zoom-in duration-300 group/preview">
+                  <div className="absolute top-4 right-4 w-32 h-auto border-2 border-zinc-500 rounded-lg overflow-hidden shadow-2xl z-50 bg-black animate-in fade-in zoom-in duration-300 group/preview">
                     <img src={capturedFrame} alt="Captured" className="w-full h-auto block" />
                     
                     {/* 关闭按钮 - 常驻右上角 */}
@@ -1923,7 +1925,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                       <div className="flex items-center gap-3">
                         <button 
                           onClick={() => videoRef.current.paused ? videoRef.current.play() : videoRef.current.pause()}
-                          className="text-white hover:text-blue-400 transition-colors"
+                          className="text-white hover:text-zinc-300 transition-colors"
                         >
                           {videoRef.current && !videoRef.current.paused ? <div className="w-3 h-3 bg-white rounded-sm" /> : <Play size={14} fill="currentColor" />}
                         </button>
@@ -1934,12 +1936,12 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                           max={duration || 100}
                           value={currentTime}
                           onChange={handleSeek}
-                          className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125"
+                          className="flex-1 h-1 bg-white/20 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125"
                         />
                         
                         <button 
                           onClick={captureCurrentFrame}
-                          className="flex items-center gap-1 bg-purple-600 hover:bg-purple-700 text-white px-2 py-1 rounded text-xs transition-colors"
+                          className="flex items-center gap-1 bg-zinc-800 hover:bg-zinc-700 text-white px-2 py-1 rounded text-xs transition-colors"
                         >
                           <Scissors size={12} />
                           <span>截取</span>
@@ -1963,8 +1965,8 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                     <button 
                       onClick={toggleSceneDirector}
                       disabled={node.data.isGenerating}
-                      className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-purple-600 cursor-pointer'
+                      className={`p-1.5 bg-zinc-900/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-zinc-800 hover:shadow-xl text-zinc-100 cursor-pointer'
                       }`} 
                       title="局部分镜 (Scene Director)"
                     >
@@ -1974,8 +1976,8 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                     <button 
                       onClick={() => !node.data.isGenerating && handleDownload()} 
                       disabled={node.data.isGenerating}
-                      className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-gray-700 cursor-pointer'
+                      className={`p-1.5 bg-zinc-900/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-zinc-800 hover:shadow-xl text-zinc-300 cursor-pointer'
                       }`} 
                       title={node.data.isGenerating ? "正在生成，请稍候" : "下载视频"}
                     >
@@ -1985,8 +1987,8 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                     <button 
                       onClick={() => !node.data.isGenerating && handleClearVideo()} 
                       disabled={node.data.isGenerating}
-                      className={`p-1.5 bg-white/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
-                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-white hover:shadow-xl text-red-500 cursor-pointer'
+                      className={`p-1.5 bg-zinc-900/90 rounded-full shadow-lg backdrop-blur-sm transition-all ${
+                        node.data.isGenerating ? 'cursor-not-allowed opacity-50' : 'hover:bg-zinc-800 hover:shadow-xl text-red-400 cursor-pointer'
                       }`} 
                       title={node.data.isGenerating ? "正在生成，请稍候" : "清除视频"}
                     >
@@ -2000,9 +2002,9 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               <div 
                 className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20"
               >
-                <Video size={64} className="text-blue-200/80" />
+                <Video size={64} className="text-zinc-700" />
                 <div 
-                  className="text-xs text-blue-300 font-medium bg-blue-50/50 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
+                  className="text-xs text-zinc-400 font-medium bg-zinc-900 px-3 py-1.5 rounded-lg border border-zinc-800 cursor-pointer hover:bg-zinc-800 transition-colors shadow-sm"
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!isDisabled) {
@@ -2031,11 +2033,11 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       )}
 
       {/* 底部控制区域 */}
-      <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
+      <div className={`bg-zinc-950 shadow-md border-x border-b border-zinc-800 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-lg opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-lg'}`} style={{ overflow: 'hidden' }}>
         {/* 参考图片预览 - 移到顶部 */}
         {referenceImages.length > 0 && (
-          <div className="flex flex-col gap-2 pb-2 border-b border-gray-50">
-            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+          <div className="flex flex-col gap-2 pb-2 border-b border-zinc-800">
+            <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
               References ({activeReferenceImages.length}/{referenceImages.length})
             </span>
             <div className="flex flex-wrap gap-2">
@@ -2056,7 +2058,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                       setPreviewImage(null);
                     }}
                   >
-                    <div className={`h-8 w-auto min-w-[32px] max-w-[60px] bg-gray-100 rounded overflow-hidden ${isIgnored ? 'opacity-50' : 'shadow-sm'}`}>
+                    <div className={`h-8 w-auto min-w-[32px] max-w-[60px] bg-zinc-900 rounded overflow-hidden ${isIgnored ? 'opacity-50' : 'shadow-sm'}`}>
                       <img 
                         src={img.src} 
                         alt={`Reference ${index + 1}`} 
@@ -2065,7 +2067,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                     </div>
                     {/* Video Frame Indicator */}
                     {img.type === 'video-frame' && (
-                       <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white ${isIgnored ? 'bg-gray-400' : (img.isAutoLastFrame ? 'bg-blue-500' : 'bg-purple-500')}`} title={img.isAutoLastFrame ? "Video Last Frame" : "Video Captured Frame"} />
+                       <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full border border-zinc-950 ${isIgnored ? 'bg-zinc-600' : (img.isAutoLastFrame ? 'bg-zinc-500' : 'bg-zinc-100')}`} title={img.isAutoLastFrame ? "Video Last Frame" : "Video Captured Frame"} />
                     )}
                     {/* Ignored Indicator */}
                     {isIgnored && (
@@ -2082,8 +2084,8 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-xs">
-            <Play size={12} className={inputStatusColor} />
-            <span className={`font-semibold ${inputStatusColor}`}>{inputStatusText}</span>
+            <Play size={12} className={inputStatusColor === 'text-zinc-900' ? 'text-zinc-300' : (inputStatusColor === 'text-zinc-600' ? 'text-zinc-400' : 'text-zinc-500')} />
+            <span className={`font-semibold ${inputStatusColor === 'text-zinc-900' ? 'text-zinc-300' : (inputStatusColor === 'text-zinc-600' ? 'text-zinc-400' : 'text-zinc-500')}`}>{inputStatusText}</span>
           </div>
           {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
         </div>
@@ -2236,11 +2238,11 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     if (audioMode === 'speech') {
       const voice = node.data.voice || 'alloy';
       const voiceOption = voiceOptions.find(v => v.value === voice);
-      return { text: `语音合成 (${voiceOption?.label || voice})`, color: 'text-blue-500' };
+      return { text: `语音合成 (${voiceOption?.label || voice})`, color: 'text-zinc-400' };
     } else {
       const style = node.data.style || 'pop';
       const styleOption = styleOptions.find(s => s.value === style);
-      return { text: `歌曲生成 (${styleOption?.label || style})`, color: 'text-purple-500' };
+      return { text: `歌曲生成 (${styleOption?.label || style})`, color: 'text-zinc-400' };
     }
   };
   
@@ -2248,11 +2250,11 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   
   return (
     <>
-      <div className={`relative w-full h-24 bg-[#dbeafe] border overflow-hidden transition-all duration-300 cursor-pointer shadow-sm ${isExpanded ? 'rounded-t-2xl border-blue-200' : 'rounded-2xl border-[#60a5fa] hover:border-blue-600'}`}>
+      <div className={`relative w-full h-24 bg-zinc-950 border-x border-t border-zinc-800 overflow-hidden transition-all duration-300 cursor-pointer ${isExpanded ? 'rounded-t-lg' : 'rounded-lg border-b'}`}>
         {node.data.isGenerating ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-blue-50/50 backdrop-blur-sm">
-            <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-1" />
-            <span className="text-[10px] text-blue-600 font-mono animate-pulse">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900/50 backdrop-blur-sm">
+            <div className="w-6 h-6 border-2 border-zinc-100 border-t-transparent rounded-full animate-spin mb-1" />
+            <span className="text-[10px] text-zinc-300 font-mono animate-pulse">
               {audioMode === 'song' ? '生成歌曲中...' : '合成语音中...'}
             </span>
           </div>
@@ -2262,7 +2264,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               <audio controls src={node.data.audioUrl} className="w-full h-8" />
             ) : (
               <>
-                <div className="w-10 h-10 rounded-full bg-white/60 flex items-center justify-center text-blue-600 shadow-sm">
+                <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center text-zinc-400 shadow-sm border border-zinc-800">
                   {audioMode === 'song' ? (
                     <Music size={16} />
                   ) : (
@@ -2270,7 +2272,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                   )}
                 </div>
                 <div className="flex items-center gap-1 h-8 opacity-60">
-                  {[...Array(15)].map((_,i) => <div key={i} className="w-1 bg-blue-500 rounded-full" style={{ height: `${Math.random() * 100}%` }}></div>)}
+                  {[...Array(15)].map((_,i) => <div key={i} className="w-1 bg-zinc-700 rounded-full" style={{ height: `${Math.random() * 100}%` }}></div>)}
                 </div>
               </>
             )}
@@ -2278,7 +2280,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         )}
       </div>
       
-      <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[400px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
+      <div className={`bg-zinc-950 shadow-sm border-x border-b border-zinc-800 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-lg opacity-100 max-h-[400px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-lg'}`} style={{ overflow: 'hidden' }}>
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-xs">
             {audioMode === 'song' ? (
@@ -2292,13 +2294,13 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </div>
         
         {/* 模式切换按钮 */}
-        <div className="flex gap-2 p-1 bg-gray-50 rounded-lg">
+        <div className="flex gap-2 p-1 bg-zinc-900 rounded-lg border border-zinc-800">
           <button
             onClick={() => toggleAudioMode('speech')}
             className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${
               audioMode === 'speech' 
-                ? 'bg-white text-blue-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm' 
+                : 'text-zinc-400 hover:text-zinc-300'
             }`}
           >
             语音生成
@@ -2307,8 +2309,8 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             onClick={() => toggleAudioMode('song')}
             className={`flex-1 py-1 px-2 rounded text-xs font-medium transition-colors ${
               audioMode === 'song' 
-                ? 'bg-white text-purple-600 shadow-sm' 
-                : 'text-gray-500 hover:text-gray-700'
+                ? 'bg-zinc-800 text-zinc-100 shadow-sm' 
+                : 'text-zinc-400 hover:text-zinc-300'
             }`}
           >
             歌曲生成
@@ -2316,9 +2318,9 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         </div>
         
         {/* 文本/歌词输入区域 - 可调整高度 */}
-        <div ref={textAreaRef} className="relative border border-gray-100 rounded-lg overflow-hidden" style={{ height: `${currentTextHeight}px` }}>
+        <div ref={textAreaRef} className="relative border border-zinc-800 rounded-lg overflow-hidden bg-zinc-900/50" style={{ height: `${currentTextHeight}px` }}>
           <textarea 
-            className="w-full h-full text-sm bg-transparent p-2 focus:ring-1 focus:ring-blue-200 outline-none resize-none border-none" 
+            className="w-full h-full text-sm bg-transparent p-2 focus:ring-1 focus:ring-zinc-700 outline-none resize-none border-none text-zinc-100 placeholder-zinc-600" 
             placeholder={audioMode === 'song' ? '输入歌词...' : '输入要朗读的文本...'} 
             value={audioMode === 'song' ? (node.data.lyrics || '') : (node.data.prompt || '')} 
             onChange={e => updateNode(node.id, { 
@@ -2332,7 +2334,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           />
           {/* 拖拽调整高度的手柄 */}
           <div 
-            className="absolute right-0 bottom-0 w-4 h-4 cursor-ns-resize z-10 text-gray-400 hover:text-blue-500 flex items-center justify-center transition-colors"
+            className="absolute right-0 bottom-0 w-4 h-4 cursor-ns-resize z-10 text-zinc-600 hover:text-zinc-400 flex items-center justify-center transition-colors"
             onMouseDown={(e) => { 
               e.stopPropagation(); 
               textAreaRef.current.initialY = e.clientY; 
@@ -2365,7 +2367,7 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           </div>
         )}
         
-        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+        <div className="flex justify-between items-center pt-2 border-t border-zinc-900">
           <div className="flex gap-1.5">
             <NodeSelect 
               value={node.data.batchSize || 1} 
@@ -2380,13 +2382,11 @@ export const AudioContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               className="w-16" 
             />
           </div>
-          <button 
+          <GenerateButton 
             onClick={handleGenerate} 
-            className="flex items-center gap-1 bg-black text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:shadow-lg active:scale-95"
-          >
-            <Wand2 size={10} className="fill-white" />
-            {audioMode === 'song' ? '生成歌曲' : '生成音频'}
-          </button>
+            text={audioMode === 'song' ? '生成歌曲' : '生成音频'}
+            icon={<Wand2 size={10} className="fill-zinc-900" />}
+          />
         </div>
       </div>
 

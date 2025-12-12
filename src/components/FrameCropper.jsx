@@ -250,11 +250,11 @@ export const FrameCropper = ({ imageSrc, onConfirm, onCancel }) => {
     <div className="fixed inset-0 z-[9999] bg-black flex flex-col items-center justify-center animate-in fade-in duration-200">
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 p-4 z-50 flex flex-col items-center pointer-events-none">
-        <div className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 mb-2">
-            <Crop size={14} className="text-blue-400" />
-            <span className="text-white text-sm font-medium">局部分镜截取</span>
+        <div className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-zinc-800 flex items-center gap-2 mb-2">
+            <Crop size={14} className="text-zinc-100" />
+            <span className="text-zinc-100 text-sm font-medium">局部分镜截取</span>
         </div>
-        <div className="text-white/50 text-xs">拖拽四角调整 • 按住中间移动</div>
+        <div className="text-zinc-500 text-xs">拖拽四角调整 • 按住中间移动</div>
       </div>
 
       {/* Main Area */}
@@ -350,15 +350,15 @@ export const FrameCropper = ({ imageSrc, onConfirm, onCancel }) => {
       {/* Bottom Bar */}
       <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-6 z-50 flex flex-col items-center gap-4">
         {/* Ratios */}
-        <div className="flex items-center gap-2 p-1 bg-white/10 rounded-lg overflow-x-auto max-w-full">
+        <div className="flex items-center gap-2 p-1 bg-zinc-900 border border-zinc-800 rounded-lg overflow-x-auto max-w-full">
             {ratios.map(r => (
                 <button
                     key={r.label}
                     onClick={() => setAspectRatio(r.value)}
                     className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                         aspectRatio === r.value 
-                            ? 'bg-blue-500 text-white shadow-lg' 
-                            : 'text-gray-400 hover:text-white hover:bg-white/10'
+                            ? 'bg-zinc-100 text-zinc-900 shadow-lg' 
+                            : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800'
                     }`}
                 >
                     {r.label}
@@ -370,14 +370,14 @@ export const FrameCropper = ({ imageSrc, onConfirm, onCancel }) => {
         <div className="flex gap-4">
             <button 
                 onClick={onCancel}
-                className="px-6 py-2 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors flex items-center gap-2"
+                className="px-6 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition-colors flex items-center gap-2"
             >
                 <X size={16} />
                 取消
             </button>
             <button 
                 onClick={handleCropConfirm}
-                className="px-6 py-2 rounded-full bg-white text-black text-sm font-bold hover:bg-gray-200 transition-colors flex items-center gap-2"
+                className="px-6 py-2 rounded-full bg-zinc-100 text-zinc-900 text-sm font-bold hover:bg-white transition-colors flex items-center gap-2"
             >
                 <Check size={16} />
                 确认裁剪

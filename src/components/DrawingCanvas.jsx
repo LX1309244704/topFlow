@@ -249,13 +249,13 @@ export const DrawingCanvas = ({
       {/* Top Bar */}
       <div className="absolute top-0 left-0 right-0 p-4 z-50 flex flex-col items-center pointer-events-none">
         <div className="bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 flex items-center gap-2 mb-2">
-            <Brush size={14} className="text-blue-400" />
+            <Brush size={14} className="text-white" />
             <span className="text-white text-sm font-medium">涂鸦编辑</span>
         </div>
       </div>
 
       {/* Canvas Area */}
-      <div className="relative w-full h-full p-8 flex items-center justify-center overflow-hidden bg-black">
+      <div className="relative w-full h-full p-8 flex items-center justify-center overflow-hidden bg-zinc-950">
         <div className="relative select-none max-w-full max-h-full flex items-center justify-center"
              style={{ width: displaySize.width, height: displaySize.height }}>
             {/* 底层背景图片 */}
@@ -306,13 +306,13 @@ export const DrawingCanvas = ({
       {/* Bottom Bar */}
       <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-md p-6 z-50 flex flex-col items-center gap-4">
         {/* Tools */}
-        <div className="flex items-center gap-4 p-2 bg-white/10 rounded-xl overflow-x-auto max-w-full">
+        <div className="flex items-center gap-4 p-2 bg-zinc-900/80 rounded-xl overflow-x-auto max-w-full border border-zinc-800">
             {/* Tool Selection */}
-            <div className="flex gap-1 bg-black/40 rounded-lg p-1">
+            <div className="flex gap-1 bg-zinc-950/50 rounded-lg p-1">
               <button
                 onClick={() => setCurrentTool('pen')}
                 className={`p-2 rounded transition-colors ${
-                  currentTool === 'pen' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'
+                  currentTool === 'pen' ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800'
                 }`}
                 title="画笔"
               >
@@ -321,7 +321,7 @@ export const DrawingCanvas = ({
               <button
                 onClick={() => setCurrentTool('eraser')}
                 className={`p-2 rounded transition-colors ${
-                  currentTool === 'eraser' ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/10'
+                  currentTool === 'eraser' ? 'bg-zinc-100 text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800'
                 }`}
                 title="橡皮擦"
               >
@@ -329,7 +329,7 @@ export const DrawingCanvas = ({
               </button>
             </div>
 
-            <div className="w-px h-8 bg-white/20 mx-1" />
+            <div className="w-px h-8 bg-zinc-800 mx-1" />
 
             {/* Colors */}
             {currentTool === 'pen' && (
@@ -347,7 +347,7 @@ export const DrawingCanvas = ({
                 </div>
             )}
             
-            <div className="w-px h-8 bg-white/20 mx-1" />
+            <div className="w-px h-8 bg-zinc-800 mx-1" />
 
             {/* Brush Size */}
             <div className="flex gap-1 items-center">
@@ -356,7 +356,7 @@ export const DrawingCanvas = ({
                     key={size}
                     onClick={() => setBrushSize(size)}
                     className={`w-8 h-8 flex items-center justify-center rounded transition-colors ${
-                      brushSize === size ? 'bg-white/20 text-white' : 'text-gray-500 hover:text-gray-300'
+                      brushSize === size ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
                     <div 
@@ -367,13 +367,13 @@ export const DrawingCanvas = ({
                 ))}
             </div>
 
-            <div className="w-px h-8 bg-white/20 mx-1" />
+            <div className="w-px h-8 bg-zinc-800 mx-1" />
 
             {/* Undo */}
             <button
               onClick={undo}
               disabled={historyStep <= 0}
-              className="p-2 rounded text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded text-zinc-300 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="撤销"
             >
               <RotateCcw size={18} />
@@ -384,14 +384,14 @@ export const DrawingCanvas = ({
         <div className="flex gap-4">
             <button 
                 onClick={onCancel}
-                className="px-6 py-2 rounded-full bg-white/10 text-white text-sm font-medium hover:bg-white/20 transition-colors flex items-center gap-2"
+                className="px-6 py-2 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-800 transition-colors flex items-center gap-2"
             >
                 <X size={16} />
                 取消
             </button>
             <button 
                 onClick={handleSave}
-                className="px-6 py-2 rounded-full bg-white text-black text-sm font-bold hover:bg-gray-200 transition-colors flex items-center gap-2"
+                className="px-6 py-2 rounded-full bg-zinc-100 text-zinc-900 text-sm font-bold hover:bg-white transition-colors flex items-center gap-2"
             >
                 <Download size={16} />
                 保存

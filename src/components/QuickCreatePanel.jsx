@@ -12,10 +12,10 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
   const fileInputRef = useRef(null);
 
   const nodeTypes = [
-    { type: 'text', label: '文本', icon: Type, color: 'text-blue-600' },
-    { type: 'image', label: '图片', icon: ImageIcon, color: 'text-green-600' },
-    { type: 'video', label: '视频', icon: Video, color: 'text-purple-600' },
-    { type: 'audio', label: '音频', icon: Music, color: 'text-orange-600' }
+    { type: 'text', label: '文本', icon: Type, color: 'text-zinc-400' },
+    { type: 'image', label: '图片', icon: ImageIcon, color: 'text-zinc-400' },
+    { type: 'video', label: '视频', icon: Video, color: 'text-zinc-400' },
+    { type: 'audio', label: '音频', icon: Music, color: 'text-zinc-400' }
   ];
 
   // 角色选项状态
@@ -357,11 +357,11 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
   // 参数选择器组件 - Gemini风格
   const renderParamSelect = (paramName, options, IconComponent, label) => (
     <div className="flex items-center gap-2">
-      {IconComponent && <IconComponent size={14} className="text-gray-500" />}
+      {IconComponent && <IconComponent size={14} className="text-zinc-500" />}
       <select 
         value={nodeParams[paramName] || ''}
         onChange={(e) => updateParam(paramName, e.target.value)}
-        className="text-xs text-gray-700 bg-transparent border-0 focus:ring-0 cursor-pointer hover:bg-gray-100 rounded-md px-2 py-1 outline-none transition-colors"
+        className="text-xs text-zinc-300 bg-transparent border-0 focus:ring-0 cursor-pointer hover:bg-zinc-900 rounded-md px-2 py-1 outline-none transition-colors"
       >
         {options.map(option => (
           <option key={option.value} value={option.value}>
@@ -375,7 +375,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
   // 滑动条组件 - Gemini风格
   const renderSlider = (paramName, min, max, step, label) => (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-gray-500 whitespace-nowrap">{label}:</span>
+      <span className="text-xs text-zinc-500 whitespace-nowrap">{label}:</span>
       <input
         type="range"
         min={min}
@@ -383,12 +383,12 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
         step={step}
         value={nodeParams[paramName] || min}
         onChange={(e) => updateParam(paramName, parseInt(e.target.value))}
-        className="flex-1 h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer slider"
+        className="flex-1 h-1.5 bg-zinc-800 rounded-full appearance-none cursor-pointer slider"
         style={{
-          background: `linear-gradient(to right, #1A73E8 0%, #1A73E8 ${((nodeParams[paramName] || min) - min) / (max - min) * 100}%, #E0E0E0 ${((nodeParams[paramName] || min) - min) / (max - min) * 100}%, #E0E0E0 100%)`
+          background: `linear-gradient(to right, #f4f4f5 0%, #f4f4f5 ${((nodeParams[paramName] || min) - min) / (max - min) * 100}%, #27272a ${((nodeParams[paramName] || min) - min) / (max - min) * 100}%, #27272a 100%)`
         }}
       />
-      <span className="text-xs text-gray-700 w-8 text-right">{nodeParams[paramName] || min}</span>
+      <span className="text-xs text-zinc-300 w-8 text-right">{nodeParams[paramName] || min}</span>
     </div>
   );
 
@@ -398,7 +398,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
       case 'text':
         return (
           <div className="flex items-center gap-3">
-            <div className="h-5 w-px bg-gray-300"></div>
+            <div className="h-5 w-px bg-zinc-800"></div>
             {renderParamSelect('model', textParams.model.options, Sparkles, '模型')}
             {renderParamSelect('role', textParams.role.options, Users, '角色')}
           </div>
@@ -407,14 +407,14 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
       case 'image':
         return (
           <div className="flex items-center gap-3">
-            <div className="h-5 w-px bg-gray-300"></div>
+            <div className="h-5 w-px bg-zinc-800"></div>
             {renderParamSelect('model', imageParams.model.options, Sparkles, '模型')}
             {renderParamSelect('ratio', imageParams.ratio.options, Square, '比例')}
             {renderParamSelect('batchSize', imageParams.batchSize.options, Layers, '批量')}
             <div className="flex items-center gap-1">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 hover:bg-gray-100 rounded text-gray-400 transition-colors"
+                className="p-1.5 hover:bg-zinc-900 rounded text-zinc-500 transition-colors"
                 title="上传图片"
               >
                 <ImageIcon size={14} />
@@ -429,7 +429,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
             </div>
             <button
               onClick={handleCreateStoryboard}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-white bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 transition-all shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-zinc-900 bg-zinc-100 hover:bg-white transition-all shadow-sm"
               title={uploadedImage ? "基于上传图片分析并创建4个分镜" : "创建4个分镜图片"}
             >
               <Grid3X3 size={14} />
@@ -441,7 +441,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
       case 'video':
         return (
           <div className="flex items-center gap-3">
-            <div className="h-5 w-px bg-gray-300"></div>
+            <div className="h-5 w-px bg-zinc-800"></div>
             {renderParamSelect('model', videoParams.model.options, Sparkles, '模型')}
             {renderParamSelect('ratio', videoParams.ratio.options, Square, '比例')}
             {renderParamSelect('batchSize', videoParams.batchSize.options, Layers, '批量')}
@@ -451,7 +451,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
       case 'audio':
         return (
           <div className="flex items-center gap-3">
-            <div className="h-5 w-px bg-gray-300"></div>
+            <div className="h-5 w-px bg-zinc-800"></div>
             {renderParamSelect('mode', audioParams.mode.options, Play, '模式')}
             {nodeParams.mode === 'speech' 
               ? renderParamSelect('voice', audioParams.voice.options, null, '音色')
@@ -470,18 +470,18 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
     <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-auto">
       {/* 类型选择器 - Gemini风格的浮动标签 */}
       <div className="flex justify-center mb-3">
-        <div className="inline-flex items-center bg-white rounded-full shadow-lg border border-gray-200 p-1">
+        <div className="inline-flex items-center bg-zinc-900 rounded-full shadow-lg border border-zinc-800 p-1">
           {nodeTypes.map(({ type, label, icon: Icon, color }) => (
             <button
               key={type}
               onClick={() => setSelectedType(type)}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-all ${
                 selectedType === type 
-                  ? 'bg-gray-900 text-white' 
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-zinc-100 text-zinc-900' 
+                  : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <Icon size={16} className={selectedType === type ? 'text-white' : 'text-gray-400'} />
+              <Icon size={16} className={selectedType === type ? 'text-zinc-900' : 'text-zinc-500'} />
               {label}
             </button>
           ))}
@@ -489,28 +489,28 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
       </div>
 
       {/* 主输入区域 - Gemini风格 */}
-      <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 w-[700px]">
+      <div className="relative bg-zinc-950 rounded-2xl shadow-lg border border-zinc-800 w-[700px]">
         {/* 参数配置区域 - 更简洁的样式 */}
-        <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+        <div className="px-4 pt-3 pb-2 border-b border-zinc-900">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-gray-500 font-medium">参数:</span>
+            <span className="text-xs text-zinc-500 font-medium">参数:</span>
             {renderParams()}
           </div>
         </div>
 
         {/* 上传图片预览区域 */}
         {uploadedImage && (
-          <div className="px-4 py-3 border-b border-gray-100">
+          <div className="px-4 py-3 border-b border-zinc-900">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
                 <img src={uploadedImage} alt="上传的图片" className="w-full h-full object-cover" />
               </div>
               <div className="flex-1">
-                <div className="text-xs text-gray-500 mb-1">已选择图片</div>
+                <div className="text-xs text-zinc-500 mb-1">已选择图片</div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleCreateWithUploadedImage}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white rounded-md text-xs font-medium hover:bg-green-600 transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-zinc-100 text-zinc-900 rounded-md text-xs font-medium hover:bg-white transition-colors"
                   >
                     <Send size={12} />
                     创建图片节点
@@ -522,7 +522,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
                         fileInputRef.current.value = '';
                       }
                     }}
-                    className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-300 transition-colors"
+                    className="px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-md text-xs font-medium hover:bg-zinc-700 transition-colors"
                   >
                     取消
                   </button>
@@ -533,7 +533,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
         )}
         
         {/* 输入框 - Gemini风格 */}
-        <div className={`relative p-2 pb-3 ${isFocused ? 'bg-gray-50' : ''} transition-colors`}>
+        <div className={`relative p-2 pb-3 ${isFocused ? 'bg-zinc-900/50' : ''} transition-colors rounded-b-2xl`}>
           <textarea
             ref={textareaRef}
             value={inputValue}
@@ -542,7 +542,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             placeholder={`输入${nodeTypes.find(t => t.type === selectedType)?.label || '文本'}内容...`}
-            className="w-full resize-none text-sm px-3 py-2 outline-none placeholder-gray-500 min-h-[48px] max-h-[150px] transition-colors"
+            className="w-full resize-none text-sm px-3 py-2 outline-none bg-transparent text-zinc-100 placeholder-zinc-600 min-h-[48px] max-h-[150px] transition-colors"
             rows={1}
             style={{ 
               height: 'auto',
@@ -558,7 +558,7 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
           
           {/* 底部操作区域 */}
           <div className="flex items-center justify-between mt-2">
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-zinc-500">
               {uploadedImage ? '使用上传的图片' : `快速创建 ${nodeTypes.find(t => t.type === selectedType)?.label || '文本'} 节点`}
             </div>
             
@@ -569,8 +569,8 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
                 disabled={!inputValue.trim()}
                 className={`p-2 rounded-full transition-all ${
                   inputValue.trim() 
-                    ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-md' 
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    ? 'bg-zinc-100 text-zinc-900 hover:bg-white shadow-md' 
+                    : 'bg-zinc-900 text-zinc-600 cursor-not-allowed'
                 }`}
                 title="创建节点"
               >

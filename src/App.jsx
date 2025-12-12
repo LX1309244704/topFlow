@@ -10,7 +10,7 @@ import { AudioContent, TextContent, ImageContent, VideoContent } from './compone
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 import { AssetModal, SaveProjectModal, ProjectMenu } from './components/Modals.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
-import { CreationMenu } from './components/TemplateComponents.jsx';
+import { CreationMenu, TemplateListModal } from './components/TemplateComponents.jsx';
 import { indexedDBManager } from './utils/indexedDB';
 import { NotificationContainer, useNotification } from './components/Notification.jsx';
 
@@ -136,10 +136,10 @@ const downloadFile = (url, filename) => {
 
 const Button = React.memo(({ children, className, variant = 'primary', onClick, icon: Icon, disabled, title }) => {
   const variants = {
-    primary: "bg-gray-900 text-white hover:bg-black disabled:bg-gray-700 shadow-md",
-    secondary: "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-    ghost: "bg-transparent text-gray-600 hover:bg-gray-100",
-    icon: "p-2 hover:bg-gray-100 rounded-md text-gray-500",
+    primary: "bg-zinc-100 text-zinc-900 hover:bg-white disabled:bg-zinc-800 shadow-md",
+    secondary: "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800",
+    ghost: "bg-transparent text-zinc-400 hover:bg-zinc-800",
+    icon: "p-2 hover:bg-zinc-800 rounded-md text-zinc-400",
   };
   return (
     <button onClick={onClick} onMouseDown={e => e.stopPropagation()} disabled={disabled} className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm active:scale-95 select-none ${variants[variant]} ${className}`} title={title}>
@@ -151,11 +151,11 @@ const Button = React.memo(({ children, className, variant = 'primary', onClick, 
 
 const NodeSelect = ({ value, options, onChange, icon: Icon, className }) => (
   <div className={`relative group flex-shrink-0 ${className}`} onMouseDown={e => e.stopPropagation()}>
-    {Icon && <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"><Icon size={10} /></div>}
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={`appearance-none bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-[10px] font-medium text-gray-700 py-1.5 ${Icon ? 'pl-6' : 'pl-2'} pr-5 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-200 cursor-pointer w-full transition-colors`}>
+    {Icon && <div className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"><Icon size={10} /></div>}
+    <select value={value} onChange={(e) => onChange(e.target.value)} className={`appearance-none bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-[10px] font-medium text-zinc-300 py-1.5 ${Icon ? 'pl-6' : 'pl-2'} pr-5 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-700 cursor-pointer w-full transition-colors`}>
       {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
     </select>
-    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><ChevronDown size={10} /></div>
+    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500"><ChevronDown size={10} /></div>
   </div>
 );
 
@@ -166,20 +166,20 @@ const HandlePoint = React.memo(({ type, top, onMouseDown, onMouseUp }) => (
     onMouseDown={onMouseDown}
     onMouseUp={onMouseUp}
   >
-    <div className={`w-3.5 h-3.5 rounded-full border-2 border-white shadow-md transition-colors duration-200 ${type === 'source' ? 'bg-blue-500' : 'bg-slate-400 hover:bg-blue-500'}`} />
+    <div className={`w-3.5 h-3.5 rounded-full border-2 border-zinc-900 shadow-md transition-colors duration-200 ${type === 'source' ? 'bg-zinc-100' : 'bg-zinc-500 hover:bg-zinc-400'}`} />
   </div>
 ));
 
-const BezierCurve = React.memo(({ start, end, stroke = "#94a3b8", strokeWidth = 3, strokeDasharray, isSelected, onDoubleClick }) => {
+const BezierCurve = React.memo(({ start, end, stroke = "#52525b", strokeWidth = 3, strokeDasharray, isSelected, onDoubleClick }) => {
   const dist = Math.abs(end.x - start.x);
   const controlOffset = Math.max(dist * 0.5, 50);
   const path = `M ${start.x} ${start.y} C ${start.x + controlOffset} ${start.y}, ${end.x - controlOffset} ${end.y}, ${end.x} ${end.y}`;
   return (
     <g onDoubleClick={onDoubleClick} className="group pointer-events-auto cursor-pointer">
       <path d={path} stroke="transparent" strokeWidth="20" fill="none" />
-      <path d={path} stroke={isSelected ? "#3b82f6" : stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={strokeDasharray} className="transition-colors duration-200 group-hover:stroke-blue-500" />
-      <circle cx={start.x} cy={start.y} r="3" fill={isSelected ? "#3b82f6" : stroke} />
-      <circle cx={end.x} cy={end.y} r="3" fill={isSelected ? "#3b82f6" : stroke} />
+      <path d={path} stroke={isSelected ? "#f4f4f5" : stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={strokeDasharray} className="transition-colors duration-200 group-hover:stroke-zinc-400" />
+      <circle cx={start.x} cy={start.y} r="3" fill={isSelected ? "#f4f4f5" : stroke} />
+      <circle cx={end.x} cy={end.y} r="3" fill={isSelected ? "#f4f4f5" : stroke} />
     </g>
   );
 });
@@ -187,7 +187,7 @@ const BezierCurve = React.memo(({ start, end, stroke = "#94a3b8", strokeWidth = 
 const InputBadge = ({ text, type }) => {
   const display = (typeof text === 'string' || typeof text === 'number') ? text : JSON.stringify(text || '');
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-100 rounded-md text-[10px] text-blue-600 mb-2 animate-in fade-in">
+    <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[10px] text-zinc-400 mb-2 animate-in fade-in">
       <LinkIcon size={10} />
       <span className="font-medium truncate max-w-[200px]">引用: {display} ({type === 'text' ? '文本' : '图片'})</span>
     </div>
@@ -407,18 +407,18 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
 
   const headerIcon = { image: ImageIcon, video: Video, audio: Music, text: FileText }[node.type];
   const headerLabel = { image: "Image", video: "Video", audio: "Audio", text: "Text" }[node.type];
-  const headerColor = { image: "text-blue-500", video: "text-blue-500", audio: "text-blue-500", text: "text-gray-500" }[node.type];
+  const headerColor = { image: "text-zinc-100", video: "text-zinc-100", audio: "text-zinc-100", text: "text-zinc-400" }[node.type];
 
   
 
   return (
-    <div className={`absolute flex flex-col transition-shadow duration-200 ease-out group rounded-2xl ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} onMouseDown={handleMouseDown}>
+    <div className={`absolute flex flex-col transition-shadow duration-200 ease-out group rounded-2xl ${isSelected ? 'shadow-2xl shadow-zinc-900/50 z-50' : 'shadow-md shadow-zinc-900/20'}`} style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} onMouseDown={handleMouseDown}>
       <HandlePoint type="target" top={handleY} onMouseUp={(e) => onConnectEnd(node.id, e)} />
       <HandlePoint type="source" top={handleY} onMouseDown={(e) => onConnectStart(node.id, e)} />
-      <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100 z-[60]"><X size={12} /></button>
+      <button onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} className="absolute -top-2 -right-2 w-6 h-6 bg-zinc-900 rounded-full shadow-md border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-red-500 hover:border-red-900 hover:bg-zinc-800 transition-all opacity-0 group-hover:opacity-100 z-[60]"><X size={12} /></button>
       <div className="flex items-center justify-between px-1 pb-1 cursor-grab active:cursor-grabbing handle select-none opacity-80 hover:opacity-100 transition-opacity">
-        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${headerColor} bg-white/80 backdrop-blur px-2 py-0.5 rounded-full shadow-sm border border-gray-100`}>{React.createElement(headerIcon, { size: 12, strokeWidth: 2.5 })}<span>{headerLabel}</span></div>
-        {node.type !== 'text' && <div className="text-[10px] text-gray-400 font-mono">#{node.id.toString().slice(-4)}</div>}
+        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${headerColor} bg-zinc-900/80 backdrop-blur px-2 py-0.5 rounded-full shadow-sm border border-zinc-800`}>{React.createElement(headerIcon, { size: 12, strokeWidth: 2.5 })}<span>{headerLabel}</span></div>
+        {node.type !== 'text' && <div className="text-[10px] text-zinc-600 font-mono">#{node.id.toString().slice(-4)}</div>}
       </div>
       <div onClick={node.type !== 'text' ? (e) => { e.stopPropagation(); setIsExpanded(true); } : undefined}>
         {node.type === 'text' && <TextContent node={node} updateNode={updateNode} generateText={apiFunctions.generateText} generateStreamText={apiFunctions.generateStreamText} handleAnalyze={(script) => apiFunctions.handleTextNodeAnalysis(script, node.id)} isAnalyzing={node.data.isAnalyzing}/>}
@@ -426,7 +426,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
         {node.type === 'video' && <VideoContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} imageInputs={linkedSources.imageInputs} videoInputs={linkedSources.videoInputs} generateText={apiFunctions.generateText}/>}
         {node.type === 'audio' && <AudioContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} />}
       </div>
-      {isExpanded && <button onClick={toggleExpand} className="absolute top-8 right-2 z-50 p-1 bg-white/90 rounded-full hover:bg-white text-gray-400 hover:text-gray-600 shadow-sm"><ChevronDown size={14} className="rotate-180" /></button>}
+      {isExpanded && <button onClick={toggleExpand} className="absolute top-8 right-2 z-50 p-1 bg-zinc-900/90 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 shadow-sm border border-zinc-800"><ChevronDown size={14} className="rotate-180" /></button>}
     </div>
   );
 });
@@ -696,7 +696,7 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
     return (
         <div 
             ref={mapRef}
-            className="absolute bottom-24 right-4 z-[100] bg-white/90 backdrop-blur-sm rounded-lg shadow-lg cursor-pointer hover:bg-white/95 transition-all duration-200"
+            className="absolute bottom-24 right-4 z-[100] bg-zinc-900/90 backdrop-blur-sm rounded-lg shadow-lg cursor-pointer hover:bg-zinc-900/95 transition-all duration-200 border border-zinc-800"
             style={{ width: '200px', height: '140px' }}
             onClick={handleMapClick}
             onMouseMove={handleMapMouseMove}
@@ -710,7 +710,7 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
                     y={0} 
                     width="100%" 
                     height="100%" 
-                    fill="#f8fafc" 
+                    fill="#18181b" 
                     rx="6"
                 />
                 
@@ -727,11 +727,11 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
                             width={Math.max(node.width, 2)}
                             height={Math.max(node.height, 2)}
                             fill={{
-                                text: '#9ca3af',
-                                image: '#3b82f6',
-                                video: '#8b5cf6',
-                                audio: '#10b981'
-                            }[node.type] || '#6b7280'}
+                                text: '#52525b',
+                                image: '#d4d4d8',
+                                video: '#a1a1aa',
+                                audio: '#71717a'
+                            }[node.type] || '#71717a'}
                             rx={2}
                             className={`transition-all duration-150 ${
                                 isClicked ? 'opacity-100 scale-105' : 
@@ -739,8 +739,8 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
                                 'opacity-80'
                             }`}
                             style={{
-                                filter: isClicked ? 'drop-shadow(0 0 4px rgba(0,0,0,0.3))' : 
-                                        isHovered ? 'drop-shadow(0 0 2px rgba(0,0,0,0.2))' : 'none'
+                                filter: isClicked ? 'drop-shadow(0 0 4px rgba(255,255,255,0.3))' : 
+                                        isHovered ? 'drop-shadow(0 0 2px rgba(255,255,255,0.2))' : 'none'
                             }}
                         />
                     );
@@ -752,8 +752,8 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
                     y={transformations.viewportRect.y}
                     width={transformations.viewportRect.width}
                     height={transformations.viewportRect.height}
-                    fill="rgba(59, 130, 246, 0.1)"
-                    stroke="#3b82f6"
+                    fill="rgba(255, 255, 255, 0.05)"
+                    stroke="#d4d4d8"
                     strokeWidth="1"
                     strokeDasharray="2,2"
                 />
@@ -768,277 +768,7 @@ const MiniMap = React.memo(({ nodes, offset, scale, canvasSize, onNavigate, visi
 
 
 
-const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
-    const templates = [
-        { 
-            id: 'story', 
-            icon: BookOpenText, 
-            title: '故事创作模板', 
-            description: '包含完整的故事情节结构和角色设定', 
-            category: '创作',
-            image: 'https://placehold.co/400x250/3b82f6/ffffff?text=故事创作',
-            color: 'bg-gradient-to-br from-blue-500 to-blue-600'
-        },
-        { 
-            id: 'script', 
-            icon: FileText, 
-            title: '剧本模板', 
-            description: '适用于电影、电视剧的剧本格式', 
-            category: '创作',
-            image: 'https://placehold.co/400x250/8b5cf6/ffffff?text=剧本创作',
-            color: 'bg-gradient-to-br from-purple-500 to-purple-600'
-        },
-        { 
-            id: 'adventure', 
-            icon: Mountain, 
-            title: '冒险故事模板', 
-            description: '包含探险、发现和冲突的经典结构', 
-            category: '故事',
-            image: 'https://placehold.co/400x250/10b981/ffffff?text=冒险故事',
-            color: 'bg-gradient-to-br from-emerald-500 to-emerald-600'
-        },
-        { 
-            id: 'romance', 
-            icon: Sparkles, 
-            title: '爱情故事模板', 
-            description: '浪漫情感发展的经典情节模式', 
-            category: '故事',
-            image: 'https://placehold.co/400x250/ec4899/ffffff?text=爱情故事',
-            color: 'bg-gradient-to-br from-pink-500 to-pink-600'
-        },
-        { 
-            id: 'mystery', 
-            icon: Search, 
-            title: '悬疑推理模板', 
-            description: '包含谜题、线索和真相揭示', 
-            category: '故事',
-            image: 'https://placehold.co/400x250/f59e0b/ffffff?text=悬疑推理',
-            color: 'bg-gradient-to-br from-amber-500 to-amber-600'
-        },
-        { 
-            id: 'animation', 
-            icon: Play, 
-            title: '动画短片模板', 
-            description: '适用于3-5分钟动画短片的脚本结构', 
-            category: '影视',
-            image: 'https://placehold.co/400x250/ef4444/ffffff?text=动画短片',
-            color: 'bg-gradient-to-br from-red-500 to-red-600'
-        },
-        { 
-            id: 'commercial', 
-            icon: Zap, 
-            title: '商业广告模板', 
-            description: '产品推广和品牌宣传的脚本格式', 
-            category: '商业',
-            image: 'https://placehold.co/400x250/06b6d4/ffffff?text=商业广告',
-            color: 'bg-gradient-to-br from-cyan-500 to-cyan-600'
-        }
-    ];
 
-    const categories = [...new Set(templates.map(t => t.category))];
-    const [activeTab, setActiveTab] = useState('all');
-    const [currentPage, setCurrentPage] = useState(1);
-    const templatesPerPage = 6;
-    
-    // 获取当前显示的模板
-    const filteredTemplates = activeTab === 'all' 
-        ? templates 
-        : templates.filter(t => t.category === activeTab);
-    
-    // 分页逻辑
-    const totalPages = Math.ceil(filteredTemplates.length / templatesPerPage);
-    const startIndex = (currentPage - 1) * templatesPerPage;
-    const endIndex = startIndex + templatesPerPage;
-    const currentTemplates = filteredTemplates.slice(startIndex, endIndex);
-    
-    // 获取当前分类的模板数量
-    const getTemplateCount = (category) => {
-        if (category === 'all') return templates.length;
-        return templates.filter(t => t.category === category).length;
-    };
-
-    // 分页处理
-    const handlePageChange = (page) => {
-        setCurrentPage(page);
-    };
-
-    // 重置页码当切换Tab时
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [activeTab]);
-    
-    const TemplateCard = ({ template }) => (
-        <button
-            key={template.id}
-            onClick={() => onSelectTemplate(template.id)}
-            className="group relative overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:scale-105 text-left"
-        >
-            {/* 图片区域 */}
-            <div className="relative h-32 overflow-hidden">
-                <img 
-                    src={template.image} 
-                    alt={template.title}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                />
-                {/* 渐变遮罩 */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
-                {/* 分类标签 */}
-                <div className="absolute top-3 left-3">
-                    <span className={`px-2 py-1 text-xs font-medium text-white rounded-full backdrop-blur-sm bg-black/30`}>
-                        {template.category}
-                    </span>
-                </div>
-                {/* 图标 */}
-                <div className={`absolute top-3 right-3 w-8 h-8 rounded-full ${template.color} flex items-center justify-center text-white shadow-lg`}>
-                    <template.icon size={16} />
-                </div>
-            </div>
-            
-            {/* 内容区域 */}
-            <div className="p-4">
-                <h3 className="text-sm font-semibold text-gray-800 mb-1 line-clamp-1 group-hover:text-blue-600 transition-colors">
-                    {template.title}
-                </h3>
-                <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">
-                    {template.description}
-                </p>
-                <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-400">点击使用</span>
-                    <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1">
-                        <ChevronRight size={14} />
-                    </div>
-                </div>
-            </div>
-        </button>
-    );
-    
-    return (
-        <div className="fixed inset-0 z-[200] animate-in fade-in duration-200" onClick={onClose}>
-            <div className="absolute bg-white rounded-2xl shadow-2xl w-[700px] max-w-full h-auto max-h-[80vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-50 duration-200" style={{ left: '100px', top: '180px' }} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center border-b border-gray-100 px-4 py-3">
-                    <h2 className="text-base font-bold flex items-center gap-2 text-blue-700">
-                        <LayoutTemplate size={18} /> 项目模板库
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                        <X size={20} />
-                    </button>
-                </div>
-                
-                {/* Tab导航 */}
-                <div className="border-b border-gray-100 px-4">
-                    <div className="flex space-x-1 overflow-x-auto pb-1">
-                        <button
-                            onClick={() => setActiveTab('all')}
-                            className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
-                                activeTab === 'all' 
-                                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500' 
-                                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                            }`}
-                        >
-                            <span>全部</span>
-                            <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{getTemplateCount('all')}</span>
-                        </button>
-                        {categories.map(category => (
-                            <button
-                                key={category}
-                                onClick={() => setActiveTab(category)}
-                                className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
-                                    activeTab === category 
-                                        ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500' 
-                                        : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                }`}
-                            >
-                                <span>{category}</span>
-                                <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{getTemplateCount(category)}</span>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-                
-                <div className="p-4 max-h-[50vh] overflow-y-auto">
-                    <div className="flex justify-between items-center mb-3">
-                        <p className="text-sm text-gray-500">
-                            {activeTab === 'all' 
-                                ? '选择适合您项目的模板快速开始创作' 
-                                : `浏览${activeTab}类模板 (${getTemplateCount(activeTab)}个)`}
-                        </p>
-                        <div className="text-xs text-gray-400">
-                            第 {currentPage} 页，共 {totalPages} 页
-                        </div>
-                    </div>
-                    
-                    {currentTemplates.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {currentTemplates.map(template => (
-                                <TemplateCard key={template.id} template={template} />
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center py-8">
-                            <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                                <LayoutTemplate size={20} className="text-gray-400" />
-                            </div>
-                            <p className="text-gray-500 text-sm">暂无模板</p>
-                        </div>
-                    )}
-                </div>
-                
-                {/* 分页控件 */}
-                {totalPages > 1 && (
-                    <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
-                        <div className="flex justify-between items-center">
-                            <button
-                                onClick={() => handlePageChange(currentPage - 1)}
-                                disabled={currentPage === 1}
-                                className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                上一页
-                            </button>
-                            
-                            <div className="flex space-x-1">
-                                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                                    <button
-                                        key={page}
-                                        onClick={() => handlePageChange(page)}
-                                        className={`w-7 h-7 text-sm rounded-lg transition-colors ${
-                                            page === currentPage
-                                                ? 'bg-blue-500 text-white'
-                                                : 'text-gray-600 hover:bg-gray-100'
-                                        }`}
-                                    >
-                                        {page}
-                                    </button>
-                                ))}
-                            </div>
-                            
-                            <button
-                                onClick={() => handlePageChange(currentPage + 1)}
-                                disabled={currentPage === totalPages}
-                                className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                            >
-                                下一页
-                            </button>
-                        </div>
-                    </div>
-                )}
-                
-                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-400">
-                            {activeTab === 'all' 
-                                ? `共 ${templates.length} 个模板` 
-                                : `${activeTab}类模板 ${filteredTemplates.length} 个`
-                            }
-                        </span>
-                        <Button onClick={onClose} variant="primary" className="bg-blue-600 hover:bg-blue-700">
-                            关闭
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-});
 
 const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onClear }) => {
     const [tempKey, setTempKey] = useState(currentKey);
@@ -1059,12 +789,12 @@ const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onClear }) 
     };
 
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-[400px] max-w-full border border-gray-100 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center border-b pb-3 mb-4"><h2 className="text-lg font-bold flex items-center gap-2 text-gray-800"><Key size={20} /> API Key 配置</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button></div>
-                <p className="text-sm text-gray-500 mb-4">配置AI服务的API Key。您可以直接输入，或点击下方按钮从服务器获取。</p>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-zinc-900 rounded-2xl shadow-2xl p-6 w-[400px] max-w-full border border-zinc-800 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center border-b border-zinc-800 pb-3 mb-4"><h2 className="text-lg font-bold flex items-center gap-2 text-zinc-100"><Key size={20} /> API Key 配置</h2><button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X size={20} /></button></div>
+                <p className="text-sm text-zinc-400 mb-4">配置AI服务的API Key。您可以直接输入，或点击下方按钮从服务器获取。</p>
                 <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <label className="block text-sm font-medium text-zinc-300 mb-1">API Key</label>
                     <div className="flex gap-2">
                         <input 
                             ref={inputRef} 
@@ -1072,21 +802,21 @@ const ApiKeyConfigModal = React.memo(({ onClose, currentKey, onSave, onClear }) 
                             value={tempKey} 
                             onChange={(e) => setTempKey(e.target.value)} 
                             placeholder="AIzaSy..." 
-                            className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm" 
+                            className="flex-1 p-2 bg-zinc-950 border border-zinc-800 rounded-lg focus:ring-zinc-500 focus:border-zinc-500 text-sm text-zinc-100 placeholder:text-zinc-600" 
                         />
                         <a 
                             href="https://ai.jmyps.com/" 
                             target="_blank" 
                             rel="noopener noreferrer" 
-                            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm active:scale-95 select-none bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+                            className="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm active:scale-95 select-none bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 whitespace-nowrap"
                         >
                             获取Key
                         </a>
                     </div>
                 </div>
-                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                    <Button onClick={() => {onClear(); setTempKey(""); onClose();}} variant="secondary" icon={Trash2} className="text-red-500 bg-red-50 hover:bg-red-100 border-red-200">清除 Key</Button>
-                    <Button onClick={() => {onSave(tempKey); onClose();}} variant="primary" icon={Save} className="bg-blue-600 hover:bg-blue-700">保存 Key</Button>
+                <div className="flex justify-between items-center pt-3 border-t border-zinc-800">
+                    <Button onClick={() => {onClear(); setTempKey(""); onClose();}} variant="secondary" icon={Trash2} className="text-red-400 bg-red-900/20 hover:bg-red-900/30 border-red-900/30">清除 Key</Button>
+                    <Button onClick={() => {onSave(tempKey); onClose();}} variant="primary" icon={Save} className="bg-zinc-100 hover:bg-white text-zinc-900">保存 Key</Button>
                 </div>
             </div>
         </div>
@@ -1098,15 +828,15 @@ const SynopsisDisplayModal = React.memo(({ onClose, synopsisData }) => {
     const safeStringify = (val) => (typeof val === 'string' || typeof val === 'number' ? val : JSON.stringify(val));
     
     return (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/30 animate-in fade-in duration-200" onClick={onClose}>
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-[500px] max-w-full h-auto max-h-[90vh] overflow-y-auto border border-gray-100 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center border-b pb-3 mb-4"><h2 className="text-lg font-bold flex items-center gap-2 text-blue-700"><BookOpenText size={20} /> AI 剧本分析结果</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={20} /></button></div>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 animate-in fade-in duration-200" onClick={onClose}>
+            <div className="bg-zinc-900 rounded-2xl shadow-2xl p-6 w-[500px] max-w-full h-auto max-h-[90vh] overflow-y-auto border border-zinc-800 animate-in fade-in zoom-in-50 duration-200" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center border-b border-zinc-800 pb-3 mb-4"><h2 className="text-lg font-bold flex items-center gap-2 text-zinc-100"><BookOpenText size={20} /> AI 剧本分析结果</h2><button onClick={onClose} className="text-zinc-500 hover:text-zinc-300"><X size={20} /></button></div>
                 <div className="space-y-6">
-                    <div><h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1"><FileText size={14}/> 剧本提纲/概要</h3><p className="text-sm text-gray-800 bg-gray-50 p-3 rounded-lg border border-gray-100 whitespace-pre-wrap">{safeStringify(safeData.synopsis)}</p></div>
-                    <div><h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1"><Type size={14}/> 主要角色</h3><ul className="list-disc list-inside space-y-1 text-sm text-gray-800 ml-4">{(Array.isArray(safeData.characters) ? safeData.characters : []).map((char, index) => <li key={index} className="truncate">{safeStringify(char)}</li>)}</ul></div>
-                    <div><h3 className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1"><Video size={14}/> 关键场景</h3><ul className="list-decimal list-inside space-y-1 text-sm text-gray-800 ml-4">{(Array.isArray(safeData.key_scenes) ? safeData.key_scenes : []).map((scene, index) => <li key={index} className="truncate">{safeStringify(scene)}</li>)}</ul></div>
+                    <div><h3 className="text-sm font-semibold text-zinc-300 mb-1 flex items-center gap-1"><FileText size={14}/> 剧本提纲/概要</h3><p className="text-sm text-zinc-200 bg-zinc-950 p-3 rounded-lg border border-zinc-800 whitespace-pre-wrap">{safeStringify(safeData.synopsis)}</p></div>
+                    <div><h3 className="text-sm font-semibold text-zinc-300 mb-1 flex items-center gap-1"><Type size={14}/> 主要角色</h3><ul className="list-disc list-inside space-y-1 text-sm text-zinc-200 ml-4">{(Array.isArray(safeData.characters) ? safeData.characters : []).map((char, index) => <li key={index} className="truncate">{safeStringify(char)}</li>)}</ul></div>
+                    <div><h3 className="text-sm font-semibold text-zinc-300 mb-1 flex items-center gap-1"><Video size={14}/> 关键场景</h3><ul className="list-decimal list-inside space-y-1 text-sm text-zinc-200 ml-4">{(Array.isArray(safeData.key_scenes) ? safeData.key_scenes : []).map((scene, index) => <li key={index} className="truncate">{safeStringify(scene)}</li>)}</ul></div>
                 </div>
-                <div className="pt-4 mt-4 border-t border-gray-100 text-xs text-gray-400 text-right">数据由 Gemini API 提供分析</div>
+                <div className="pt-4 mt-4 border-t border-zinc-800 text-xs text-zinc-500 text-right">数据由 Gemini API 提供分析</div>
             </div>
         </div>
     );
@@ -2623,6 +2353,34 @@ export default function InfiniteCanvasApp() {
       setDragState(null);
   }, [dragState, offset, scale, nodes, connecting, mousePos, onConnectEnd]);
 
+  const handleWheel = useCallback((e) => {
+    // 如果按住Ctrl键，执行缩放
+    if (e.ctrlKey) {
+        // 依赖全局useEffect来阻止浏览器默认缩放行为
+        const zoomSensitivity = 0.002;
+        const delta = -e.deltaY * zoomSensitivity;
+        const newScale = Math.min(Math.max(0.1, scale + delta), 5);
+        
+        if (newScale !== scale && containerRef.current) {
+            const rect = containerRef.current.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const newOffsetX = mouseX - (mouseX - offset.x) * (newScale / scale);
+            const newOffsetY = mouseY - (mouseY - offset.y) * (newScale / scale);
+            
+            setScale(newScale);
+            setOffset({ x: newOffsetX, y: newOffsetY });
+        }
+    } else {
+        // 否则执行平移
+        setOffset(prev => ({
+            x: prev.x - e.deltaX,
+            y: prev.y - e.deltaY
+        }));
+    }
+  }, [scale, offset]);
+
   const onNodeSelect = useCallback((e, id) => {
       e.stopPropagation();
       if (['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
@@ -2739,10 +2497,10 @@ export default function InfiniteCanvasApp() {
     };
   }, []);
 
-  if (isLoading) return <div className="flex items-center justify-center h-screen w-full bg-[#f3f4f6] text-gray-500">Loading...</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-screen w-full bg-black text-zinc-400">Loading...</div>;
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#f3f4f6] overflow-hidden font-sans text-slate-800 selection:bg-blue-100">
+    <div className="flex flex-col h-screen w-full bg-black overflow-hidden font-sans text-zinc-100 selection:bg-zinc-800">
       {/* 通知系统容器 */}
       <NotificationContainer notifications={notifications} removeNotification={removeNotification} />
       
@@ -2756,29 +2514,23 @@ export default function InfiniteCanvasApp() {
       
       {/* 项目加载动画 */}
       {isProjectLoading && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-gradient-to-br from-blue-50/30 via-white/50 to-purple-50/30 backdrop-blur-lg animate-in fade-in duration-500">
-          <div className="bg-gradient-to-br from-white/95 to-gray-50/95 backdrop-blur-xl rounded-3xl shadow-2xl p-10 w-96 max-w-full border border-white/50 animate-in zoom-in-50 duration-500">
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-500">
+          <div className="bg-zinc-900/95 backdrop-blur-xl rounded-2xl shadow-xl p-10 w-96 max-w-full border border-zinc-800 animate-in zoom-in-50 duration-500">
             <div className="flex flex-col items-center gap-6">
               {/* 加载图标 */}
               <div className="relative">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center shadow-lg border border-zinc-800">
                   <FolderKanban size={24} className="text-white" />
                 </div>
-                <div className="absolute -inset-2 border-2 border-blue-300/50 rounded-3xl animate-pulse"></div>
               </div>
               
               {/* 加载动画 */}
               <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
                 <div className="text-center">
-                  <h3 className="text-xl font-bold text-gray-900 mb-2 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">加载项目中</h3>
-                  <p className="text-sm text-gray-500">正在加载项目数据，请稍候...</p>
+                  <h3 className="text-xl font-bold text-white mb-2">加载项目中</h3>
+                  <p className="text-sm text-zinc-400">正在加载项目数据，请稍候...</p>
                 </div>
-              </div>
-              
-              {/* 进度指示器 */}
-              <div className="w-full bg-gray-200/50 rounded-full h-1.5 overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-500 to-purple-500 h-full rounded-full animate-pulse w-3/4"></div>
               </div>
             </div>
           </div>
@@ -2787,7 +2539,7 @@ export default function InfiniteCanvasApp() {
       
       {/* 网络错误通知 */}
       {networkError && (
-        <div className="fixed top-4 right-4 z-[150] bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 rounded shadow-lg max-w-md animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="fixed top-4 right-4 z-[150] bg-orange-900/20 border border-orange-900/50 text-orange-400 p-4 rounded-lg shadow-lg max-w-md animate-in fade-in slide-in-from-right-2 duration-300">
           <div className="flex">
             <div className="py-1">
               <svg className="fill-current h-6 w-6 text-orange-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
@@ -2803,31 +2555,31 @@ export default function InfiniteCanvasApp() {
       )}
       
       {showApiTest && (
-        <div className="absolute inset-0 z-[180] bg-black/30 flex items-center justify-center animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl p-4 w-[90%] max-w-5xl max-h-[90vh] overflow-auto animate-in zoom-in-50 duration-200">
+        <div className="absolute inset-0 z-[180] bg-black/50 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200">
+          <div className="bg-zinc-900 rounded-xl shadow-2xl p-4 w-[90%] max-w-5xl max-h-[90vh] overflow-auto animate-in zoom-in-50 duration-200 border border-zinc-800">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <TestTube size={24} className="text-blue-500" />
+              <h2 className="text-xl font-bold text-zinc-100 flex items-center gap-2">
+                <TestTube size={24} className="text-zinc-100" />
                 API 功能测试
               </h2>
-              <button onClick={() => setShowApiTest(false)} className="text-gray-400 hover:text-gray-600">
+              <button onClick={() => setShowApiTest(false)} className="text-zinc-500 hover:text-zinc-300">
                 <X size={24} />
               </button>
             </div>
-            <React.Suspense fallback={<div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+            <React.Suspense fallback={<div className="flex justify-center p-8"><div className="w-8 h-8 border-4 border-zinc-100 border-t-transparent rounded-full animate-spin"></div></div>}>
               <ApiTest />
             </React.Suspense>
           </div>
         </div>
       )}
       
-      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} tabIndex={0}>
-         <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#d1d5db 1.5px, transparent 1.5px)', opacity: 0.6 }} />
+      <div ref={containerRef} className="flex-1 w-full h-full relative bg-black cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} tabIndex={0}>
+         <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#27272a 1.5px, transparent 1.5px)', opacity: 1 }} />
          <div className="absolute inset-0 origin-top-left will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
             <svg className="absolute inset-0 overflow-visible pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
                {(edges || []).map(e => <BezierCurve key={e.id} start={getHandlePosition(e.source, 'source', nodes)} end={getHandlePosition(e.target, 'target', nodes)} onDoubleClick={(ev) => { ev.stopPropagation(); removeEdge(e.id); }} />)}
-               {connecting && <BezierCurve start={getHandlePosition(connecting.nodeId, 'source', nodes)} end={mousePos} stroke="#3b82f6" strokeWidth={4} strokeDasharray="5,5" />}
-               {menu && <BezierCurve start={getHandlePosition(menu.sourceId, 'source', nodes)} end={{ x: menu.x, y: menu.y }} stroke="#94a3b8" strokeDasharray="4,4" strokeWidth={2} />}
+               {connecting && <BezierCurve start={getHandlePosition(connecting.nodeId, 'source', nodes)} end={mousePos} stroke="#52525b" strokeWidth={4} strokeDasharray="5,5" />}
+               {menu && <BezierCurve start={getHandlePosition(menu.sourceId, 'source', nodes)} end={{ x: menu.x, y: menu.y }} stroke="#52525b" strokeDasharray="4,4" strokeWidth={2} />}
             </svg>
             {(nodes || []).map(n => {
                 // 去重处理，确保每个源节点只被计算一次
@@ -2848,29 +2600,29 @@ export default function InfiniteCanvasApp() {
             })}
             {menu && <CreationMenu x={menu.x} y={menu.y} onSelect={(t) => { addNode(t, menu.x + 50, menu.y, menu.sourceId); setMenu(null); }} onClose={() => setMenu(null)} />}
          </div>
-         {dragState?.type === 'select' && <div style={{ position: 'fixed', left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), backgroundColor: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3b82f6', zIndex: 9999, pointerEvents: 'none' }} />}
+         {dragState?.type === 'select' && <div style={{ position: 'fixed', left: Math.min(dragState.startX, dragState.currentX), top: Math.min(dragState.startY, dragState.currentY), width: Math.abs(dragState.currentX - dragState.startX), height: Math.abs(dragState.currentY - dragState.startY), backgroundColor: 'rgba(255, 255, 255, 0.05)', border: '1px solid #52525b', zIndex: 9999, pointerEvents: 'none' }} />}
         <div className="absolute bottom-6 left-4 z-[100] pointer-events-auto flex flex-col gap-2">
-         <Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-gray-300 transition-colors ${userApiKey ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`} title="配置 API Key">API Key</Button>
+         <Button variant="secondary" icon={Key} onClick={() => setShowApiKeyModal(true)} className={`shadow-lg border-zinc-800 transition-colors ${userApiKey ? 'bg-zinc-900 text-zinc-400 hover:text-zinc-100' : 'bg-red-900/20 text-red-400'}`} title="配置 API Key">API Key</Button>
          
          {/* 画布缩放控制 */}
-         <div className="bg-white rounded-lg shadow-lg border border-gray-300 p-2 flex items-center gap-2">
+         <div className="bg-zinc-900 rounded-lg shadow-lg border border-zinc-800 p-2 flex items-center gap-2">
            <button 
              onClick={() => setScale(s => Math.max(0.1, s - 0.1))}
-             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600"
+             className="w-8 h-8 flex items-center justify-center rounded hover:bg-zinc-800 transition-colors text-zinc-400"
              title="缩小"
            >
              <Minus size={16} />
            </button>
            <button 
              onClick={() => setScale(1)}
-             className="text-sm font-medium text-gray-700 min-w-[40px] text-center px-2 py-1 rounded hover:bg-gray-100 transition-colors"
+             className="text-sm font-medium text-zinc-300 min-w-[40px] text-center px-2 py-1 rounded hover:bg-zinc-800 transition-colors"
              title="重置到100%"
            >
              {Math.round(scale * 100)}%
            </button>
            <button 
              onClick={() => setScale(s => Math.min(3, s + 0.1))}
-             className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-100 transition-colors text-gray-600"
+             className="w-8 h-8 flex items-center justify-center rounded hover:bg-zinc-800 transition-colors text-zinc-400"
              title="放大"
            >
              <Plus size={16} />
@@ -2879,32 +2631,32 @@ export default function InfiniteCanvasApp() {
         </div>
          <div className="absolute bottom-6 right-4 z-[100] pointer-events-auto flex gap-2">
            <Button 
-             variant="secondary" 
-             icon={Map} 
-             onClick={() => setShowMiniMap(!showMiniMap)}
-             className={`shadow-lg border-gray-300 transition-colors ${showMiniMap ? 'bg-blue-50 text-blue-600' : 'bg-white'}`}
-             title="显示/隐藏导航图"
-           >
-             导航图
-           </Button>
-           <Button variant="secondary" icon={LayoutTemplate} onClick={handleAutoLayout} className="bg-white shadow-lg border-gray-300">自动整理</Button>
-         </div>
-         
-         {/* 右上角保存项目按钮 */}
-         <div className="absolute top-6 right-4 z-[100] pointer-events-auto">
-           <Button 
-             variant="secondary" 
-             icon={Save} 
-             onClick={() => setShowSaveProjectModal(true)} 
-             className="bg-white shadow-lg border-gray-300 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-             title="保存当前项目"
-           >
-             保存项目
-           </Button>
+            variant="secondary" 
+            icon={Map} 
+            onClick={() => setShowMiniMap(!showMiniMap)}
+            className={`shadow-lg border-zinc-800 transition-colors ${showMiniMap ? 'bg-zinc-800 text-zinc-100' : 'bg-zinc-900'}`}
+            title="显示/隐藏导航图"
+          >
+            导航图
+          </Button>
+          <Button variant="secondary" icon={LayoutTemplate} onClick={handleAutoLayout} className="bg-zinc-900 shadow-lg border-zinc-800">自动整理</Button>
+        </div>
+        
+        {/* 右上角保存项目按钮 */}
+        <div className="absolute top-6 right-4 z-[100] pointer-events-auto">
+          <Button 
+            variant="secondary" 
+            icon={Save} 
+            onClick={() => setShowSaveProjectModal(true)} 
+            className="bg-zinc-900 shadow-lg border-zinc-800 hover:bg-zinc-800 hover:text-zinc-100 transition-colors"
+            title="保存当前项目"
+          >
+            保存项目
+          </Button>
          </div>
          
          {/* 画布底部快捷提示 */}
-         <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-gray-600">
+         <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 z-[100] pointer-events-none text-xs text-zinc-500">
            双击连线删除 • Shift+框选移动 • Ctrl+滚轮缩放
          </div>
          

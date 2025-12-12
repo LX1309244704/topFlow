@@ -4,12 +4,12 @@ import { Button } from './UI.jsx';
 
 // 创建菜单组件
 export const CreationMenu = ({ x, y, onSelect, onClose }) => (
-  <div className="absolute z-[100] w-56 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 ring-1 ring-gray-200 overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-left" style={{ left: x, top: y }} onMouseDown={e => e.stopPropagation()}>
-    <div className="px-3 py-2 bg-gray-50/80 border-b border-gray-100 flex justify-between items-center">
-      <span className="text-[10px] font-semibold text-blue-600 flex items-center gap-1">
-        <Sparkles size={10}/> 创建新节点
+  <div className="absolute z-[100] w-56 bg-zinc-950 rounded-xl shadow-xl border border-zinc-800 ring-1 ring-zinc-800 overflow-hidden animate-in fade-in zoom-in duration-200 origin-top-left" style={{ left: x, top: y }} onMouseDown={e => e.stopPropagation()}>
+    <div className="px-3 py-2 bg-zinc-950 border-b border-zinc-900 flex justify-between items-center">
+      <span className="text-[10px] font-semibold text-zinc-100 flex items-center gap-1">
+        <Sparkles size={10} className="text-zinc-500"/> 创建新节点
       </span>
-      <button onClick={onClose} className="text-gray-400 hover:bg-gray-200 rounded p-0.5">
+      <button onClick={onClose} className="text-zinc-500 hover:bg-zinc-800 rounded p-0.5 transition-colors">
         <X size={12}/>
       </button>
     </div>
@@ -23,14 +23,14 @@ export const CreationMenu = ({ x, y, onSelect, onClose }) => (
         <button 
           key={i.id} 
           onClick={() => onSelect(i.id)} 
-          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-blue-50 group transition-colors text-left"
+          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-zinc-900 group transition-colors text-left"
         >
-          <div className="w-8 h-8 rounded-lg bg-gray-100 text-gray-500 group-hover:bg-blue-500 group-hover:text-white flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-zinc-900 text-zinc-500 group-hover:bg-zinc-100 group-hover:text-zinc-900 flex items-center justify-center transition-colors">
             <i.icon size={16}/>
           </div>
           <div>
-            <div className="text-xs font-bold text-gray-700 group-hover:text-blue-700">{i.l}</div>
-            <div className="text-[10px] text-gray-400">{i.d}</div>
+            <div className="text-xs font-bold text-zinc-100">{i.l}</div>
+            <div className="text-[10px] text-zinc-500">{i.d}</div>
           </div>
         </button>
       ))}
@@ -48,7 +48,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '包含完整的故事情节结构和角色设定', 
       category: '创作',
       image: 'https://placehold.co/400x250/3b82f6/ffffff?text=故事创作',
-      color: 'bg-gradient-to-br from-blue-500 to-blue-600'
+      color: 'bg-zinc-900'
     },
     { 
       id: 'script', 
@@ -57,7 +57,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '适用于电影、电视剧的剧本格式', 
       category: '创作',
       image: 'https://placehold.co/400x250/8b5cf6/ffffff?text=剧本创作',
-      color: 'bg-gradient-to-br from-purple-500 to-purple-600'
+      color: 'bg-zinc-800'
     },
     { 
       id: 'adventure', 
@@ -66,7 +66,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '包含探险、发现和冲突的经典结构', 
       category: '故事',
       image: 'https://placehold.co/400x250/10b981/ffffff?text=冒险故事',
-      color: 'bg-gradient-to-br from-emerald-500 to-emerald-600'
+      color: 'bg-zinc-700'
     },
     { 
       id: 'romance', 
@@ -75,7 +75,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '浪漫情感发展的经典情节模式', 
       category: '故事',
       image: 'https://placehold.co/400x250/ec4899/ffffff?text=爱情故事',
-      color: 'bg-gradient-to-br from-pink-500 to-pink-600'
+      color: 'bg-zinc-600'
     },
     { 
       id: 'mystery', 
@@ -84,7 +84,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '包含谜题、线索和真相揭示', 
       category: '故事',
       image: 'https://placehold.co/400x250/f59e0b/ffffff?text=悬疑推理',
-      color: 'bg-gradient-to-br from-amber-500 to-amber-600'
+      color: 'bg-zinc-800'
     },
     { 
       id: 'animation', 
@@ -93,7 +93,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '适用于3-5分钟动画短片的脚本结构', 
       category: '影视',
       image: 'https://placehold.co/400x250/ef4444/ffffff?text=动画短片',
-      color: 'bg-gradient-to-br from-red-500 to-red-600'
+      color: 'bg-zinc-900'
     },
     { 
       id: 'commercial', 
@@ -102,7 +102,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
       description: '产品推广和品牌宣传的脚本格式', 
       category: '商业',
       image: 'https://placehold.co/400x250/06b6d4/ffffff?text=商业广告',
-      color: 'bg-gradient-to-br from-cyan-500 to-cyan-600'
+      color: 'bg-zinc-700'
     }
   ];
 
@@ -142,40 +142,40 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
     <button
       key={template.id}
       onClick={() => onSelectTemplate(template.id)}
-      className="group relative overflow-hidden rounded-2xl bg-white shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:scale-105 text-left"
+      className="group relative overflow-hidden rounded-2xl bg-zinc-900 shadow-sm border border-zinc-800 hover:shadow-lg transition-all duration-300 hover:scale-105 text-left"
     >
       {/* 图片区域 */}
       <div className="relative h-32 overflow-hidden">
         <img 
           src={template.image} 
           alt={template.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 opacity-80 group-hover:opacity-100"
         />
         {/* 渐变遮罩 */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
         {/* 分类标签 */}
         <div className="absolute top-3 left-3">
-          <span className={`px-2 py-1 text-xs font-medium text-white rounded-full backdrop-blur-sm bg-black/30`}>
+          <span className={`px-2 py-1 text-xs font-medium text-white rounded-full backdrop-blur-sm bg-black/50 border border-white/10`}>
             {template.category}
           </span>
         </div>
         {/* 图标 */}
-        <div className={`absolute top-3 right-3 w-8 h-8 rounded-full ${template.color} flex items-center justify-center text-white shadow-lg`}>
+        <div className={`absolute top-3 right-3 w-8 h-8 rounded-full ${template.color} flex items-center justify-center text-white shadow-lg border border-white/10`}>
           <template.icon size={16} />
         </div>
       </div>
       
       {/* 内容区域 */}
       <div className="p-4">
-        <h3 className="text-sm font-semibold text-gray-800 mb-1 line-clamp-1 group-hover:text-blue-600 transition-colors">
+        <h3 className="text-sm font-semibold text-zinc-100 mb-1 line-clamp-1 group-hover:text-white transition-colors">
           {template.title}
         </h3>
-        <p className="text-xs text-gray-500 mb-3 line-clamp-2 leading-relaxed">
+        <p className="text-xs text-zinc-400 mb-3 line-clamp-2 leading-relaxed">
           {template.description}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-400">点击使用</span>
-          <div className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1">
+          <span className="text-xs text-zinc-500">点击使用</span>
+          <div className="text-zinc-100 opacity-0 group-hover:opacity-100 transition-opacity transform group-hover:translate-x-1">
             <ChevronRight size={14} />
           </div>
         </div>
@@ -184,30 +184,30 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
   );
   
   return (
-    <div className="fixed inset-0 z-[200] animate-in fade-in duration-200" onClick={onClose}>
-      <div className="absolute bg-white rounded-2xl shadow-2xl w-[700px] max-w-full h-auto max-h-[80vh] overflow-hidden border border-gray-100 animate-in fade-in zoom-in-50 duration-200" style={{ left: '100px', top: '180px' }} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center border-b border-gray-100 px-4 py-3">
-          <h2 className="text-base font-bold flex items-center gap-2 text-blue-700">
+    <div className="fixed inset-0 z-[200] animate-in fade-in duration-200 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="absolute bg-zinc-950 rounded-2xl shadow-2xl w-[700px] max-w-full h-auto max-h-[80vh] overflow-hidden border border-zinc-800 animate-in fade-in zoom-in-50 duration-200" style={{ left: '100px', top: '180px' }} onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-center border-b border-zinc-900 px-4 py-3">
+          <h2 className="text-base font-bold flex items-center gap-2 text-zinc-100">
             <LayoutTemplate size={18} /> 项目模板库
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300">
             <X size={20} />
           </button>
         </div>
         
         {/* Tab导航 */}
-        <div className="border-b border-gray-100 px-4">
+        <div className="border-b border-zinc-900 px-4">
           <div className="flex space-x-1 overflow-x-auto pb-1">
             <button
               onClick={() => setActiveTab('all')}
               className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
                 activeTab === 'all' 
-                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500' 
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  ? 'bg-zinc-900 text-zinc-100 border-b-2 border-zinc-100' 
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
               }`}
             >
               <span>全部</span>
-              <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+              <span className="text-xs bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-full">
                 {getTemplateCount('all')}
               </span>
             </button>
@@ -217,12 +217,12 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
                 onClick={() => setActiveTab(category)}
                 className={`px-3 py-2 text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center gap-1.5 shrink-0 ${
                   activeTab === category 
-                    ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-500' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    ? 'bg-zinc-900 text-zinc-100 border-b-2 border-zinc-100' 
+                    : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'
                 }`}
               >
                 <span>{category}</span>
-                <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">
+                <span className="text-xs bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded-full">
                   {getTemplateCount(category)}
                 </span>
               </button>
@@ -232,12 +232,12 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
         
         <div className="p-4 max-h-[50vh] overflow-y-auto">
           <div className="flex justify-between items-center mb-3">
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-zinc-500">
               {activeTab === 'all' 
                 ? '选择适合您项目的模板快速开始创作' 
                 : `浏览${activeTab}类模板 (${getTemplateCount(activeTab)}个)`}
             </p>
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-zinc-600">
               第 {currentPage} 页，共 {totalPages} 页
             </div>
           </div>
@@ -250,22 +250,22 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
             </div>
           ) : (
             <div className="text-center py-8">
-              <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-                <LayoutTemplate size={20} className="text-gray-400" />
+              <div className="w-12 h-12 mx-auto mb-3 bg-zinc-900 rounded-full flex items-center justify-center">
+                <LayoutTemplate size={20} className="text-zinc-500" />
               </div>
-              <p className="text-gray-500 text-sm">暂无模板</p>
+              <p className="text-zinc-500 text-sm">暂无模板</p>
             </div>
           )}
         </div>
         
         {/* 分页控件 */}
         {totalPages > 1 && (
-          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
+          <div className="px-4 py-3 border-t border-zinc-900 bg-zinc-900/30">
             <div className="flex justify-between items-center">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 text-sm text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 上一页
               </button>
@@ -277,8 +277,8 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
                     onClick={() => handlePageChange(page)}
                     className={`w-7 h-7 text-sm rounded-lg transition-colors ${
                       page === currentPage
-                        ? 'bg-blue-500 text-white'
-                        : 'text-gray-600 hover:bg-gray-100'
+                        ? 'bg-zinc-100 text-zinc-900'
+                        : 'text-zinc-400 hover:bg-zinc-800'
                     }`}
                   >
                     {page}
@@ -289,7 +289,7 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
               <button
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-3 py-1.5 text-sm text-zinc-400 bg-zinc-900 border border-zinc-800 rounded-lg hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 下一页
               </button>
@@ -297,14 +297,14 @@ export const TemplateListModal = React.memo(({ onClose, onSelectTemplate }) => {
           </div>
         )}
         
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50">
+        <div className="px-6 py-4 border-t border-zinc-900 bg-zinc-900/30">
           <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-400">
+            <span className="text-xs text-zinc-500">
               {activeTab === 'all' 
                 ? `共 ${templates.length} 个模板` 
                 : `${activeTab}类模板 ${filteredTemplates.length} 个`}
             </span>
-            <Button onClick={onClose} variant="primary" className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={onClose} variant="primary" className="bg-zinc-100 text-zinc-900 hover:bg-white border-none">
               关闭
             </Button>
           </div>

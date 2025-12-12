@@ -33,10 +33,10 @@ const NotificationItem = ({ notification, onClose }) => {
   };
 
   const colors = {
-    [NOTIFICATION_TYPES.SUCCESS]: 'bg-green-50 border-green-200 text-green-800',
-    [NOTIFICATION_TYPES.ERROR]: 'bg-red-50 border-red-200 text-red-800',
-    [NOTIFICATION_TYPES.WARNING]: 'bg-yellow-50 border-yellow-200 text-yellow-800',
-    [NOTIFICATION_TYPES.INFO]: 'bg-blue-50 border-blue-200 text-blue-800'
+    [NOTIFICATION_TYPES.SUCCESS]: 'bg-green-950/30 border-green-900 text-green-300',
+    [NOTIFICATION_TYPES.ERROR]: 'bg-red-950/30 border-red-900 text-red-300',
+    [NOTIFICATION_TYPES.WARNING]: 'bg-yellow-950/30 border-yellow-900 text-yellow-300',
+    [NOTIFICATION_TYPES.INFO]: 'bg-zinc-900 border-zinc-800 text-zinc-300'
   };
 
   const IconComponent = icons[notification.type] || Info;
@@ -44,7 +44,7 @@ const NotificationItem = ({ notification, onClose }) => {
   return (
     <div 
       className={`
-        flex items-start gap-3 p-4 rounded-xl border shadow-lg backdrop-blur-sm 
+        flex items-start gap-3 p-4 rounded-xl border shadow-2xl backdrop-blur-md 
         transition-all duration-300 transform animate-in slide-in-from-right-full
         ${colors[notification.type]}
         ${isExiting ? 'opacity-0 scale-95 translate-x-full' : 'opacity-100 scale-100 translate-x-0'}
@@ -61,7 +61,7 @@ const NotificationItem = ({ notification, onClose }) => {
           setIsExiting(true);
           setTimeout(() => onClose(notification.id), 300);
         }}
-        className="flex-shrink-0 p-1 rounded-full hover:bg-black/10 transition-colors"
+        className="flex-shrink-0 p-1 rounded-full hover:bg-white/10 transition-colors"
       >
         <X size={16} />
       </button>
@@ -70,14 +70,14 @@ const NotificationItem = ({ notification, onClose }) => {
 };
 
 // 通知容器
-const NotificationContainer = ({ notifications, onCloseNotification }) => {
+const NotificationContainer = ({ notifications, removeNotification }) => {
   return (
     <div className="fixed top-4 right-4 z-[200] space-y-3 pointer-events-none">
       {notifications.map(notification => (
         <div key={notification.id} className="pointer-events-auto">
           <NotificationItem 
             notification={notification} 
-            onClose={onCloseNotification}
+            onClose={removeNotification}
           />
         </div>
       ))}

@@ -227,15 +227,15 @@ const NodeCard = React.memo(({
   }[node.type];
   
   const headerColor = { 
-    image: "text-blue-500", 
-    video: "text-blue-500", 
-    audio: "text-blue-500", 
-    text: "text-gray-500" 
+    image: "text-zinc-300", 
+    video: "text-zinc-300", 
+    audio: "text-zinc-300", 
+    text: "text-zinc-500" 
   }[node.type];
 
   return (
     <div 
-      className={`absolute flex flex-col transition-shadow duration-200 ease-out group ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} 
+      className={`absolute flex flex-col transition-all duration-200 ease-out group bg-zinc-950 rounded-xl ${isSelected ? 'ring-2 ring-zinc-100 shadow-xl z-50' : 'shadow-sm border border-zinc-800 hover:shadow-md'}`} 
       style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} 
       onMouseDown={handleMouseDown}
       onMouseUp={(e) => {
@@ -251,19 +251,20 @@ const NodeCard = React.memo(({
       
       <button 
         onClick={(e) => { e.stopPropagation(); onDelete(node.id); }} 
-        className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full shadow-md border border-gray-200 flex items-center justify-center text-gray-400 hover:text-red-500 hover:border-red-200 transition-all opacity-0 group-hover:opacity-100 z-[60]"
+        className="absolute -top-2 -right-2 w-6 h-6 bg-zinc-900 rounded-full shadow-md border border-zinc-800 flex items-center justify-center text-zinc-500 hover:text-red-500 hover:border-red-900 transition-all opacity-0 group-hover:opacity-100 z-[60]"
       >
         <X size={12} />
       </button>
       
-      <div className="flex items-center justify-between px-1 pb-1 cursor-grab active:cursor-grabbing handle select-none opacity-80 hover:opacity-100 transition-opacity">
-        <div className={`flex items-center gap-1.5 text-[11px] font-semibold ${headerColor} bg-white/80 backdrop-blur px-2 py-0.5 rounded-full shadow-sm border border-gray-100`}>
-          {React.createElement(headerIcon, { size: 12, strokeWidth: 2.5 })}<span>{headerLabel}</span>
+      <div className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing handle select-none border-b border-zinc-900">
+        <div className="flex items-center gap-2 text-xs font-semibold text-zinc-200">
+          {React.createElement(headerIcon, { size: 14, strokeWidth: 2, className: "text-zinc-400" })}
+          <span>{headerLabel}</span>
         </div>
-        {node.type !== 'text' && <div className="text-[10px] text-gray-400 font-mono">#{node.id.toString().slice(-4)}</div>}
+        {node.type !== 'text' && <div className="text-[10px] text-zinc-600 font-mono">#{node.id.toString().slice(-4)}</div>}
       </div>
       
-      <div onClick={node.type !== 'text' ? (e) => { e.stopPropagation(); setIsExpanded(true); } : undefined}>
+      <div className="p-1" onClick={node.type !== 'text' ? (e) => { e.stopPropagation(); setIsExpanded(true); } : undefined}>
         {node.type === 'text' && (
           <TextContent 
             node={node} 
@@ -310,7 +311,7 @@ const NodeCard = React.memo(({
       {isExpanded && (
         <button 
           onClick={toggleExpand} 
-          className="absolute top-8 right-2 z-50 p-1 bg-white/90 rounded-full hover:bg-white text-gray-400 hover:text-gray-600 shadow-sm"
+          className="absolute top-8 right-2 z-50 p-1 bg-zinc-900/90 rounded-full hover:bg-zinc-800 text-zinc-500 hover:text-zinc-300 shadow-sm"
         >
           <ChevronDown size={14} className="rotate-180" />
         </button>

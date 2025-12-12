@@ -12,10 +12,10 @@ export const Button = React.memo(({
   title 
 }) => {
   const variants = {
-    primary: "bg-gray-900 text-white hover:bg-black disabled:bg-gray-700 shadow-md",
-    secondary: "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50",
-    ghost: "bg-transparent text-gray-600 hover:bg-gray-100",
-    icon: "p-2 hover:bg-gray-100 rounded-md text-gray-500",
+    primary: "bg-zinc-100 text-zinc-900 hover:bg-white disabled:bg-zinc-800 shadow-sm",
+    secondary: "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800 shadow-sm",
+    ghost: "bg-transparent text-zinc-400 hover:bg-zinc-800",
+    icon: "p-2 hover:bg-zinc-800 rounded-md text-zinc-400",
   };
 
   return (
@@ -44,15 +44,15 @@ export const NodeSelect = ({ value, options, onChange, icon: Icon, className, ma
   
   return (
     <div className={`relative group flex-shrink-0 ${className}`} onMouseDown={e => e.stopPropagation()}>
-      {Icon && <div className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"><Icon size={10} /></div>}
+      {Icon && <div className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"><Icon size={10} /></div>}
       <select 
         value={value} 
         onChange={(e) => onChange(e.target.value)} 
-        className={`appearance-none bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 text-[10px] font-medium text-gray-700 py-1.5 ${Icon ? 'pl-6' : 'pl-2'} pr-5 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-200 cursor-pointer w-full transition-colors`}
+        className={`appearance-none bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-[10px] font-medium text-zinc-300 py-1.5 ${Icon ? 'pl-6' : 'pl-2'} pr-5 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-700 cursor-pointer w-full transition-colors`}
       >
         {safeOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
-      <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+      <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
         <ChevronDown size={10} />
       </div>
     </div>
@@ -120,30 +120,30 @@ export const EnhancedNodeSelect = ({ value, options, onChange, icon: Icon, class
     <div className={`relative enhanced-select-container ${className}`}>
       {/* 自定义选择框 - 简化样式 */}
       <div 
-        className="flex items-center justify-between bg-gray-50 border border-gray-200 text-[10px] font-medium text-gray-700 py-1.5 px-2 rounded-md cursor-pointer transition-colors hover:bg-gray-100 hover:border-gray-300"
+        className="flex items-center justify-between bg-zinc-900 border border-zinc-800 text-[10px] font-medium text-zinc-300 py-1.5 px-2 rounded-md cursor-pointer transition-colors hover:bg-zinc-800 hover:border-zinc-700"
         onClick={toggleDropdown}
         onMouseDown={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-1 truncate">
-          {Icon && <Icon size={10} className="text-gray-500 flex-shrink-0" />}
+          {Icon && <Icon size={10} className="text-zinc-500 flex-shrink-0" />}
           <span className="truncate max-w-[120px]">{selectedOption?.label || '选择角色...'}</span>
         </div>
-        <ChevronDown size={10} className={`text-gray-400 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={10} className={`text-zinc-500 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
       </div>
       
       {/* 下拉菜单 - 优化样式和性能 */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-md shadow-xl z-50 max-h-80 min-h-[40px] overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-1 bg-zinc-900 border border-zinc-800 rounded-md shadow-xl z-50 max-h-80 min-h-[40px] overflow-hidden">
           {/* 搜索框 */}
-          <div className="p-2 border-b border-gray-200">
+          <div className="p-2 border-b border-zinc-800">
             <div className="relative">
-              <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500" />
               <input
                 type="text"
                 placeholder="搜索角色..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-6 pr-2 py-1.5 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300"
+                className="w-full pl-6 pr-2 py-1.5 text-xs bg-zinc-950 border border-zinc-800 rounded focus:outline-none focus:ring-1 focus:ring-zinc-700 text-zinc-200 placeholder-zinc-600"
                 autoFocus
               />
             </div>
@@ -163,23 +163,23 @@ export const EnhancedNodeSelect = ({ value, options, onChange, icon: Icon, class
                   return (
                     <div
                       key={opt.value}
-                      className={`px-3 py-2 text-xs cursor-pointer transition-colors hover:bg-blue-50 border-b border-gray-50 last:border-b-0 ${
-                        value === opt.value ? 'bg-blue-100 text-blue-700' : 'text-gray-700'
+                      className={`px-3 py-2 text-xs cursor-pointer transition-colors hover:bg-zinc-800 border-b border-zinc-800 last:border-b-0 ${
+                        value === opt.value ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400'
                       }`}
                       onClick={() => handleOptionClick(opt)}
                     >
                       {/* 角色名称 */}
                       <div className="font-medium mb-1 truncate">{opt.label}</div>
                       {/* 角色详情 - 最多显示3行 */}
-                      <div className="text-gray-600 leading-tight break-words overflow-hidden" style={{ 
+                      <div className="text-zinc-500 leading-tight break-words overflow-hidden" style={{ 
                         display: '-webkit-box',
                         WebkitBoxOrient: 'vertical',
                         WebkitLineClamp: 3,
                         lineClamp: 3
                       }}>
-                        {roleDetail || <span className="text-gray-400">（无详情）</span>}
+                        {roleDetail || <span className="text-zinc-600">（无详情）</span>}
                         {hasMoreLines && (
-                          <span className="text-gray-400 text-[10px] italic">...</span>
+                          <span className="text-zinc-600 text-[10px] italic">...</span>
                         )}
                       </div>
                     </div>
@@ -187,7 +187,7 @@ export const EnhancedNodeSelect = ({ value, options, onChange, icon: Icon, class
                 })}
               </div>
             ) : (
-              <div className="px-3 py-4 text-xs text-gray-500 text-center">
+              <div className="px-3 py-4 text-xs text-zinc-500 text-center">
                 未找到匹配的角色
               </div>
             )}
@@ -195,7 +195,7 @@ export const EnhancedNodeSelect = ({ value, options, onChange, icon: Icon, class
           
           {/* 显示总数信息 */}
           {safeOptions.length > 0 && (
-            <div className="px-3 py-1.5 text-[10px] text-gray-500 border-t border-gray-200 bg-gray-50">
+            <div className="px-3 py-1.5 text-[10px] text-zinc-500 border-t border-zinc-800 bg-zinc-900">
               共 {safeOptions.length} 个角色，{filteredOptions.length} 个匹配
             </div>
           )}
@@ -219,7 +219,7 @@ export const HandlePoint = React.memo(({ type, top, onMouseDown, onMouseUp }) =>
       if (onMouseUp) onMouseUp(e);
     }}
   >
-    <div className={`w-3.5 h-3.5 rounded-full border-2 border-white shadow-md transition-colors duration-200 ${type === 'source' ? 'bg-blue-500' : 'bg-slate-400 hover:bg-blue-500'}`} />
+    <div className={`w-3.5 h-3.5 rounded-full border-2 border-zinc-950 shadow-md transition-colors duration-200 ${type === 'source' ? 'bg-zinc-100' : 'bg-zinc-600 hover:bg-zinc-400'}`} />
   </div>
 ));
 
@@ -227,7 +227,7 @@ export const HandlePoint = React.memo(({ type, top, onMouseDown, onMouseUp }) =>
 export const BezierCurve = React.memo(({ 
   start, 
   end, 
-  stroke = "#94a3b8", 
+  stroke = "#52525b", // zinc-600
   strokeWidth = 3, 
   strokeDasharray, 
   isSelected, 
@@ -240,9 +240,9 @@ export const BezierCurve = React.memo(({
   return (
     <g onDoubleClick={onDoubleClick} className="group pointer-events-auto cursor-pointer">
       <path d={path} stroke="transparent" strokeWidth="20" fill="none" />
-      <path d={path} stroke={isSelected ? "#3b82f6" : stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={strokeDasharray} className="transition-colors duration-200 group-hover:stroke-blue-500" />
-      <circle cx={start.x} cy={start.y} r="3" fill={isSelected ? "#3b82f6" : stroke} />
-      <circle cx={end.x} cy={end.y} r="3" fill={isSelected ? "#3b82f6" : stroke} />
+      <path d={path} stroke={isSelected ? "#f4f4f5" : stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={strokeDasharray} className="transition-colors duration-200 group-hover:stroke-zinc-400" />
+      <circle cx={start.x} cy={start.y} r="3" fill={isSelected ? "#f4f4f5" : stroke} />
+      <circle cx={end.x} cy={end.y} r="3" fill={isSelected ? "#f4f4f5" : stroke} />
     </g>
   );
 });
@@ -251,7 +251,7 @@ export const BezierCurve = React.memo(({
 export const InputBadge = ({ text, type }) => {
   const display = (typeof text === 'string' || typeof text === 'number') ? text : JSON.stringify(text || '');
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1 bg-blue-50 border border-blue-100 rounded-md text-[10px] text-blue-600 mb-2 animate-in fade-in">
+    <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[10px] text-zinc-400 mb-2 animate-in fade-in">
       <LinkIcon size={10} />
       <span className="font-medium truncate max-w-[200px]">引用: {display} ({type === 'text' ? '文本' : '图片'})</span>
     </div>
