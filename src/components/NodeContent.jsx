@@ -172,6 +172,7 @@ const GenerateButton = ({
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
   // 涂鸦相关状态
   const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [editingImageSrc, setEditingImageSrc] = useState(null);
 
   // 分辨率选项 - 根据模型类型提供不同的分辨率选项
   const resolutionOptions = {
@@ -247,7 +248,8 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
   // 涂鸦相关处理函数
   const handleDrawingSave = (editedImage) => {
-    updateNode(node.id, { data: { ...node.data, generatedImage: editedImage } });
+    // 保存到 doodleImage 而不是覆盖 generatedImage，防止底图污染
+    updateNode(node.id, { data: { ...node.data, doodleImage: editedImage } });
     setIsDrawingMode(false);
   };
 
@@ -255,8 +257,12 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     setIsDrawingMode(false);
   };
 
-  const startDrawingMode = () => {
+  const startDrawingMode = (useOriginal = false) => {
     if (node.data.generatedImage) {
+      // 如果指定使用原图，或者没有涂鸦图，就使用原图
+      // 否则（不指定且有涂鸦图），使用涂鸦图
+      const src = useOriginal ? node.data.generatedImage : (node.data.doodleImage || node.data.generatedImage);
+      setEditingImageSrc(src);
       setIsDrawingMode(true);
     }
   };
@@ -402,6 +408,9 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   // 分镜模式处理函数
   const handleStoryboard = async () => {
     if (!node.data.prompt) return;
+
+    // 优先使用涂鸦图片，如果没有则使用生成的图片
+    const activeImage = node.data.doodleImage || node.data.generatedImage;
     
     // 立即设置源节点的生成状态，提供即时反馈
     updateNode(node.id, { data: { ...node.data, isGenerating: true } });
@@ -417,7 +426,7 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       // 根据是否有参考图片来构建不同的提示词
       let storyboardPrompt;
       
-      if (node.data.generatedImage) {
+      if (activeImage) {
         // 如果有参考图片，使用更专业的电影化分镜提示词
         storyboardPrompt = `你是一位专业的电影导演和视觉艺术家，擅长创作具有电影感的分镜序列。请仔细分析参考图片的视觉元素，并基于基础提示词创作4个连贯的电影化关键帧描述。
 
@@ -616,14 +625,14 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       }
       
       // 使用重试机制生成分镜
-      const result = await generateStoryboardWithRetry(storyboardPrompt, !!node.data.generatedImage);
+      const result = await generateStoryboardWithRetry(storyboardPrompt, !!activeImage);
       
       // 处理结果
       let scenes = result.scenes || [];
       
       // 如果AI返回的分镜描述不足4个，使用更专业的默认分镜描述
       if (scenes.length < 4) {
-        const defaultScenes = node.data.generatedImage ? [
+        const defaultScenes = activeImage ? [
           `${node.data.prompt} - 大远景低角度镜头，人物位于画面下方，展示环境空间，24mm广角，深景深，冷色调，硬朗侧光，电影感构图`,
           `${node.data.prompt} - 面部特写镜头，三分法构图，眼神低垂，85mm中长焦，极浅景深，戏剧性光影，皮肤质感清晰`,
           `${node.data.prompt} - 低角度特写镜头，仰拍人物侧脸，下颌线条紧绷，50mm标准镜头，逆光轮廓光，展现决心时刻`,
@@ -643,14 +652,14 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
       // 创建分镜节点并生成图片
       if (window.topFlow && window.topFlow.createStoryboardNodes) {
-        await window.topFlow.createStoryboardNodes(node, scenes, node.data.generatedImage);
+        await window.topFlow.createStoryboardNodes(node, scenes, activeImage);
       }
       
     } catch (error) {
       console.error('分镜生成过程中发生错误:', error);
       
       // 如果生成失败，使用更专业的默认分镜描述创建节点
-      const defaultScenes = node.data.generatedImage ? [
+      const defaultScenes = activeImage ? [
         `${node.data.prompt} - 大远景低角度镜头，人物位于画面下方，展示环境空间，24mm广角，深景深，冷色调，硬朗侧光，电影感构图`,
         `${node.data.prompt} - 面部特写镜头，三分法构图，眼神低垂，85mm中长焦，极浅景深，戏剧性光影，皮肤质感清晰`,
         `${node.data.prompt} - 低角度特写镜头，仰拍人物侧脸，下颌线条紧绷，50mm标准镜头，逆光轮廓光，展现决心时刻`,
@@ -663,7 +672,7 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       ];
 
       if (window.topFlow && window.topFlow.createStoryboardNodes) {
-        await window.topFlow.createStoryboardNodes(node, defaultScenes, node.data.generatedImage);
+        await window.topFlow.createStoryboardNodes(node, defaultScenes, activeImage);
       }
     } finally {
       // 分镜生成状态由全局状态管理，不需要重置源节点的生成状态
@@ -674,6 +683,9 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   // 网格模式处理函数
   const handleGrid = async () => {
     if (!node.data.prompt) return;
+
+    // 优先使用涂鸦图片，如果没有则使用生成的图片
+    const activeImage = node.data.doodleImage || node.data.generatedImage;
     
     // 立即设置源节点的生成状态，提供即时反馈
     updateNode(node.id, { data: { ...node.data, isGenerating: true } });
@@ -682,7 +694,7 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       // 根据是否有参考图片来构建不同的提示词
       let gridPrompt;
       
-      if (node.data.generatedImage) {
+      if (activeImage) {
         // 如果有参考图片，要求AI生成JSON格式的关键帧序列，强调视觉一致性
         gridPrompt = `请仔细分析参考图片的视觉风格、构图、色调、人物特征等元素，生成的分镜关键帧需要保持与参考图片的视觉一致性。
 
@@ -940,7 +952,7 @@ ${node.data.prompt}
       }
       if (scenes.length < 4) {
         // 如果AI返回不足4个场景，使用与漫画风格相关的基本分镜
-        const comicScenes = node.data.generatedImage ? [
+        const comicScenes = activeImage ? [
           `${node.data.prompt} - 漫画开场镜头，建立场景`,
           `${node.data.prompt} - 漫画动作镜头，主体表演`,
           `${node.data.prompt} - 漫画反应镜头，细节特写`,
@@ -960,7 +972,7 @@ ${node.data.prompt}
 
       // 创建网格节点
       if (window.topFlow && window.topFlow.createGridNodes) {
-        await window.topFlow.createGridNodes(node, scenes, node.data.generatedImage, jsonData);
+        await window.topFlow.createGridNodes(node, scenes, activeImage, jsonData);
       }
       
     } catch (error) {
@@ -1086,16 +1098,49 @@ ${node.data.prompt}
         {node.data.generatedImage ? (
           <>
             <img src={node.data.generatedImage} alt="Gen" className="w-full h-full object-cover select-none" draggable={false} onDragStart={(e) => e.preventDefault()} />
+            
+            {/* 涂鸦预览 - 悬浮在右上角 (仿照视频节点) */}
+            {node.data.doodleImage && (
+              <div className="absolute top-4 right-4 w-1/3 max-w-[120px] aspect-square border-2 border-purple-500 rounded-lg overflow-hidden shadow-2xl z-20 bg-black animate-in fade-in zoom-in duration-300 group/preview">
+                <img src={node.data.doodleImage} alt="Doodle" className="w-full h-full object-cover block" />
+                
+                {/* 关闭按钮 */}
+                <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault(); // 阻止默认行为
+                      updateNode(node.id, { data: { ...node.data, doodleImage: null } });
+                    }}
+                    className="absolute top-1 right-1 bg-black/50 text-white p-0.5 rounded-full hover:bg-red-500 transition-colors opacity-0 group-hover/preview:opacity-100 z-30" // 增加 z-index
+                    title="清除涂鸦"
+                  >
+                    <X size={12} />
+                </button>
+
+                {/* 编辑按钮 - 覆盖在预览图上 */}
+                <div className="absolute inset-0 bg-black/20 hover:bg-black/0 transition-colors flex items-center justify-center opacity-0 hover:opacity-100 gap-2 cursor-pointer"
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       startDrawingMode(false); // 编辑当前的涂鸦
+                     }}
+                >
+                  <div className="bg-white text-black p-1 rounded-full hover:bg-gray-200" title="继续编辑">
+                    <Brush size={14} />
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
               <div className="flex gap-2">
                 {/* 涂鸦按钮 */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    startDrawingMode();
+                    startDrawingMode(true); // 始终编辑原图，创建新的涂鸦
                   }}
                   className="p-1.5 bg-white/80 rounded-full shadow-sm backdrop-blur-sm transition-colors hover:bg-white text-gray-700 cursor-pointer"
-                  title="涂鸦编辑"
+                  title="编辑原图"
                 >
                   <Brush size={14} />
                 </button>
@@ -1176,7 +1221,7 @@ ${node.data.prompt}
           isVisible={isDrawingMode}
           onCancel={handleDrawingCancel}
           onSave={handleDrawingSave}
-          imageSrc={node.data.generatedImage}
+          imageSrc={editingImageSrc}
         />,
         document.body
       )}
@@ -1494,12 +1539,21 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
 };
 
 // 视频节点内容组件 - 重新实现，确保上传按钮可见
-export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, generateText }) => {
+export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, videoInputs, generateText, linkedSources }) => {
   const videoModelOptions = [
     {value:"sora2",label:"Sora 2.0"}, 
     {value:"veo_3_1-fast",label:"veo_3_1-fast"}
   ];
   
+  // 视频模型限制配置
+  const getModelConstraints = (model) => {
+    switch(model) {
+      case "sora2": return { maxImages: 1, label: "参考图模式" };
+      case "veo_3_1-fast": return { maxImages: 2, label: "首尾帧模式" };
+      default: return { maxImages: 0, label: "不支持参考图" };
+    }
+  };
+
   const fileRef = useRef(null);
   const videoRef = useRef(null);
   const [showSceneDirector, setShowSceneDirector] = useState(false);
@@ -1507,6 +1561,65 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   const [showCropper, setShowCropper] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [previewPos, setPreviewPos] = useState({ x: 0, y: 0 });
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // 获取所有参考图片
+  const referenceImages = React.useMemo(() => {
+    const images = [];
+    
+    // 1. 检查是否有视频输入节点带有 capturedFrame 或 lastFrame
+    const videoInputNodes = videoInputs || linkedSources?.videoInputs || [];
+    videoInputNodes.forEach(n => {
+      // 优先使用截取的帧，如果没有则使用尾帧
+      // 只有当 capturedFrame 明确存在时才使用它
+      // 如果 capturedFrame 被删除了（为 null），则自动回退到 lastFrame
+      let frameToUse = null;
+      let isAuto = false;
+
+      if (n.data.capturedFrame) {
+        frameToUse = n.data.capturedFrame;
+      } else if (n.data.lastFrame) {
+        frameToUse = n.data.lastFrame;
+        isAuto = true;
+      }
+      
+      if (frameToUse && typeof frameToUse === 'string' && frameToUse.startsWith('data:')) {
+        images.push({
+          id: n.id,
+          src: frameToUse,
+          type: 'video-frame',
+          isAutoLastFrame: isAuto // 标记是否为自动提取的尾帧
+        });
+      }
+    });
+    
+    // 2. 检查是否有图片输入节点
+    if (imageInputs && imageInputs.length > 0) {
+      imageInputs.forEach(n => {
+        // 优先使用涂鸦图片，如果没有则使用生成的基础图片
+        const imageToUse = n.data.doodleImage || n.data.generatedImage;
+        if (imageToUse) {
+           images.push({
+            id: n.id,
+            src: imageToUse,
+            type: 'image',
+            isDoodle: !!n.data.doodleImage
+          });
+        }
+      });
+    }
+    
+    return images;
+  }, [linkedSources, imageInputs]);
+
+  // 如果没有本地 capturedFrame，但 node.data 中有（可能是从 persistence 恢复的），则恢复它
+  useEffect(() => {
+    if (!capturedFrame && node.data.capturedFrame) {
+      setCapturedFrame(node.data.capturedFrame);
+    }
+  }, [node.data.capturedFrame]);
 
   const handleVideoUpload = (e) => {
     const file = e.target.files[0];
@@ -1514,6 +1627,10 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       const reader = new FileReader();
       reader.onloadend = () => {
         updateNode(node.id, { data: { ...node.data, videoUrl: reader.result, uploadedVideo: true } });
+        // 重置 input value，允许重复上传同一个文件
+        if (fileRef.current) {
+          fileRef.current.value = '';
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -1533,7 +1650,17 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   };
 
   const handleClearVideo = () => {
-    updateNode(node.id, { data: { ...node.data, videoUrl: null, generatedVideo: false, uploadedVideo: false } });
+    updateNode(node.id, { 
+      data: { 
+        ...node.data, 
+        videoUrl: null, 
+        generatedVideo: false, 
+        uploadedVideo: false,
+        capturedFrame: null,
+        lastFrame: null,
+        aspectRatio: 16/9 // 重置为默认比例
+      } 
+    });
     setCapturedFrame(null);
     setShowSceneDirector(false);
     setShowCropper(false);
@@ -1561,7 +1688,78 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
   const handleLoadedMetadata = () => {
     if (videoRef.current) {
-      setDuration(videoRef.current.duration);
+      const { videoWidth, videoHeight, duration } = videoRef.current;
+      setDuration(duration);
+      
+      // Calculate aspect ratio variables
+      let aspectRatio = 16/9;
+      let ratioLabel = "16:9";
+
+      if (videoWidth && videoHeight) {
+        aspectRatio = videoWidth / videoHeight;
+        
+        // 根据视频比例自动选择最接近的预设选项
+        if (Math.abs(aspectRatio - 16/9) < 0.1) ratioLabel = "16:9";
+        else if (Math.abs(aspectRatio - 9/16) < 0.1) ratioLabel = "9:16";
+        else if (Math.abs(aspectRatio - 1) < 0.1) ratioLabel = "1:1";
+        else if (Math.abs(aspectRatio - 4/3) < 0.1) ratioLabel = "4:3";
+        else if (Math.abs(aspectRatio - 3/4) < 0.1) ratioLabel = "3:4";
+        
+        // 强制更新节点数据，即使比例看起来没变，也要确保UI刷新
+        // 使用一个随机的时间戳或者强制覆盖来触发React的更新机制
+        updateNode(node.id, { 
+          data: { 
+            ...node.data, 
+            aspectRatio: aspectRatio,
+            ratio: ratioLabel, // 同步更新下拉菜单的值
+            _forceUpdate: Date.now() // 添加一个强制更新字段
+          } 
+        });
+      }
+
+      // Extract last frame for reference if not already present
+      if (!node.data.lastFrame && duration > 0) {
+        // Create a temporary video element to extract the last frame
+        const tempVideo = document.createElement('video');
+        tempVideo.src = node.data.videoUrl;
+        tempVideo.crossOrigin = 'anonymous';
+        tempVideo.muted = true;
+        tempVideo.currentTime = duration; // Seek to end
+        
+        tempVideo.onseeked = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoWidth || 640;
+            canvas.height = videoHeight || 360;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+            const lastFrameData = canvas.toDataURL('image/png');
+            
+            // Important: Include the calculated aspect ratio and ratio label
+            // to prevent them from being overwritten by stale node.data
+            updateNode(node.id, { 
+              data: { 
+                ...node.data, 
+                aspectRatio: aspectRatio,
+                ratio: ratioLabel,
+                lastFrame: lastFrameData,
+                _forceUpdate: Date.now()
+              } 
+            });
+          } catch (err) {
+            console.error('Error extracting last frame:', err);
+          } finally {
+            // Cleanup
+            tempVideo.removeAttribute('src');
+            tempVideo.load();
+          }
+        };
+        
+        // Trigger loading if needed
+        if (tempVideo.readyState < 2) {
+            tempVideo.load();
+        }
+      }
     }
   };
 
@@ -1591,6 +1789,14 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     // 设置最终图片
     setCapturedFrame(croppedImage);
     
+    // 保存到节点数据中，以便后续连接使用
+    updateNode(node.id, { 
+      data: { 
+        ...node.data, 
+        capturedFrame: croppedImage 
+      } 
+    });
+    
     // 关闭裁剪和时间轴模块，但保留截图显示
     setShowCropper(false);
     setShowSceneDirector(false);
@@ -1616,7 +1822,10 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   };
 
   const isDisabled = node.data.isGenerating;
-  const imageCount = imageInputs.length;
+  const currentModel = node.data.model || "sora2";
+  const { maxImages } = getModelConstraints(currentModel);
+  const activeReferenceImages = referenceImages.slice(0, maxImages);
+  
   let inputStatusText;
   let inputStatusColor;
   
@@ -1624,8 +1833,25 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     inputStatusText = '已上传视频';
     inputStatusColor = 'text-green-500';
   } else {
-    inputStatusText = imageCount === 0 ? '文生视频模式 (T2V)' : imageCount === 1 ? '参考图生视频模式 (I2V)' : `首尾帧生视频模式 (${imageCount} Refs)`;
-    inputStatusColor = imageCount === 0 ? 'text-gray-500' : imageCount === 1 ? 'text-orange-500' : 'text-purple-500';
+    if (activeReferenceImages.length === 0) {
+      inputStatusText = '文生视频模式 (T2V)';
+      inputStatusColor = 'text-gray-500';
+    } else {
+      if (currentModel === 'sora2') {
+        inputStatusText = '参考图生视频模式 (I2V)';
+      } else if (currentModel === 'veo_3_1-fast') {
+        inputStatusText = activeReferenceImages.length === 1 ? '首帧生视频模式' : '首尾帧生视频模式';
+      } else {
+        inputStatusText = '未知模式';
+      }
+      
+      // 添加忽略警告
+      if (referenceImages.length > maxImages) {
+        inputStatusText += ` (忽略后${referenceImages.length - maxImages}张)`;
+      }
+      
+      inputStatusColor = activeReferenceImages.length === 1 ? 'text-orange-500' : 'text-purple-500';
+    }
   }
 
   return (
@@ -1650,13 +1876,24 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                 
                 {/* 截取的帧预览 - 悬浮在右上角 */}
                 {capturedFrame && !showCropper && (
-                  <div className="absolute top-4 right-4 w-32 aspect-video border-2 border-purple-500 rounded-lg overflow-hidden shadow-2xl z-50 bg-black animate-in fade-in zoom-in duration-300 group/preview">
-                    <img src={capturedFrame} alt="Captured" className="w-full h-full object-contain" />
+                  <div className="absolute top-4 right-4 w-32 h-auto border-2 border-purple-500 rounded-lg overflow-hidden shadow-2xl z-50 bg-black animate-in fade-in zoom-in duration-300 group/preview">
+                    <img src={capturedFrame} alt="Captured" className="w-full h-auto block" />
                     
                     {/* 关闭按钮 - 常驻右上角 */}
                     <button 
-                        onClick={() => setCapturedFrame(null)}
-                        className="absolute top-1 right-1 bg-black/50 text-white p-0.5 rounded-full hover:bg-red-500 transition-colors opacity-0 group-hover/preview:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault(); // 阻止默认行为
+                          setCapturedFrame(null);
+                          // 同时更新节点数据，清除保存的capturedFrame
+                          updateNode(node.id, { 
+                            data: { 
+                              ...node.data, 
+                              capturedFrame: null 
+                            } 
+                          });
+                        }}
+                        className="absolute top-1 right-1 bg-black/50 text-white p-0.5 rounded-full hover:bg-red-500 transition-colors opacity-0 group-hover/preview:opacity-100 z-30" // 增加 z-index
                         title="关闭"
                       >
                         <X size={12} />
@@ -1669,13 +1906,6 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
                         title="重新裁剪"
                       >
                         <Crop size={16} />
-                      </button>
-                      <button 
-                        onClick={handleUseCapturedFrame}
-                        className="bg-purple-600 text-white p-1 rounded-full hover:bg-purple-700"
-                        title="使用此帧"
-                      >
-                        <CheckCircle size={16} />
                       </button>
                     </div>
                   </div>
@@ -1767,11 +1997,18 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               </>
             ) : (
               /* 无视频时显示上传界面 - 使用与图片节点相同的样式 */
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+              <div 
+                className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20"
+              >
                 <Video size={64} className="text-blue-200/80" />
                 <div 
                   className="text-xs text-blue-300 font-medium bg-blue-50/50 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-blue-100 cursor-pointer hover:bg-blue-100 transition-colors"
-                  onClick={() => !isDisabled && fileRef.current?.click()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!isDisabled) {
+                      fileRef.current?.click();
+                    }
+                  }}
                 >
                   点击上传视频
                 </div>
@@ -1795,6 +2032,54 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
       {/* 底部控制区域 */}
       <div className={`bg-white shadow-xl border-x border-b border-gray-200 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-2xl opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-2xl'}`} style={{ overflow: 'hidden' }}>
+        {/* 参考图片预览 - 移到顶部 */}
+        {referenceImages.length > 0 && (
+          <div className="flex flex-col gap-2 pb-2 border-b border-gray-50">
+            <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wider">
+              References ({activeReferenceImages.length}/{referenceImages.length})
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {referenceImages.map((img, index) => {
+                const isIgnored = index >= maxImages;
+                return (
+                  <div 
+                    key={`${img.id}-${index}`}
+                    className={`relative cursor-pointer transition-all ${isIgnored ? 'opacity-40 grayscale hover:opacity-100 hover:grayscale-0' : 'hover:scale-105'}`}
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setPreviewPos({ x: rect.left, y: rect.top - 8 });
+                      setPreviewImage(img.src);
+                      setShowPreview(true);
+                    }}
+                    onMouseLeave={() => {
+                      setShowPreview(false);
+                      setPreviewImage(null);
+                    }}
+                  >
+                    <div className={`h-8 w-auto min-w-[32px] max-w-[60px] bg-gray-100 rounded overflow-hidden ${isIgnored ? 'opacity-50' : 'shadow-sm'}`}>
+                      <img 
+                        src={img.src} 
+                        alt={`Reference ${index + 1}`} 
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                    {/* Video Frame Indicator */}
+                    {img.type === 'video-frame' && (
+                       <div className={`absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white ${isIgnored ? 'bg-gray-400' : (img.isAutoLastFrame ? 'bg-blue-500' : 'bg-purple-500')}`} title={img.isAutoLastFrame ? "Video Last Frame" : "Video Captured Frame"} />
+                    )}
+                    {/* Ignored Indicator */}
+                    {isIgnored && (
+                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                         <div className="bg-black/50 text-white text-[8px] px-1 rounded">忽略</div>
+                       </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 text-xs">
             <Play size={12} className={inputStatusColor} />
@@ -1827,10 +2112,21 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         >
           <AspectRatioSelector 
             value={node.data.ratio || "16:9"} 
-            onChange={v => updateNode(node.id, { data: {...node.data, ratio: v} })}
+            onChange={v => {
+              const [w, h] = v.split(':').map(Number);
+              updateNode(node.id, { 
+                data: {
+                  ...node.data, 
+                  ratio: v,
+                  aspectRatio: w/h
+                } 
+              });
+            }}
             options={[
               {value:"16:9",label:"16:9"}, 
-              {value:"9:16",label:"9:16"}, 
+              {value:"9:16",label:"9:16"},
+              {value:"4:3",label:"4:3"},
+              {value:"3:4",label:"3:4"},
               {value:"1:1",label:"1:1"}
             ]}
           />
@@ -1844,6 +2140,28 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
           />
         </BottomActionBar>
       </div>
+
+      {/* Reference Image Portal Preview */}
+      {showPreview && previewImage && createPortal(
+        <div 
+          className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200"
+          style={{ 
+            left: previewPos.x, 
+            top: previewPos.y,
+            transform: 'translateY(-100%)',
+            maxWidth: 'min(80vw, 600px)',
+            maxHeight: 'min(80vh, 600px)'
+          }}
+        >
+          <img 
+            src={previewImage} 
+            alt="Reference Large" 
+            className="w-auto h-auto rounded shadow-2xl object-contain"
+            style={{ maxHeight: 'inherit', maxWidth: 'inherit' }}
+          />
+        </div>,
+        document.body
+      )}
     </>
   );
 };

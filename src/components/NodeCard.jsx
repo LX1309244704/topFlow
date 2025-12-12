@@ -50,7 +50,37 @@ const NodeCard = React.memo(({
       if (imageInputNodes.length > 0) referenceImage = imageInputNodes[0].data.generatedImage;
       else if (node.data.generatedImage) referenceImage = node.data.generatedImage;
     } else if (node.type === 'video') {
-      referenceImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
+      // 优先检查视频节点输入是否有 capturedFrame 或 lastFrame
+      // 如果有视频节点作为输入，且该节点有 capturedFrame 或 lastFrame，则优先使用它作为参考图
+      const videoInputNodes = linkedSources.videoInputs || [];
+      const capturedFrames = videoInputNodes
+        .map(n => n.data.capturedFrame || n.data.lastFrame)
+        .filter(img => img && typeof img === 'string' && img.startsWith('data:'));
+      
+      let allReferences = [];
+      
+      if (capturedFrames.length > 0) {
+        allReferences = [...capturedFrames];
+      } else {
+         // 如果没有截取帧或已保存的最后一帧，尝试使用videoUrl提取最后一帧（异步操作可能不适合这里同步获取，但我们尽力获取已有的数据）
+         // 注意：这里的filter可能会漏掉只有videoUrl但没有lastFrame的情况
+         // 但由于我们不能在渲染阶段异步提取，只能依赖已经提取好的数据
+         // 所以确保NodeContent中正确提取并保存lastFrame至关重要
+      }
+      
+      // 添加普通图片输入
+      const normalImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
+      if (normalImages.length > 0) {
+        allReferences = [...allReferences, ...normalImages];
+      }
+
+      // 根据模型限制参考图数量
+      const currentModel = node.data.model || "sora2";
+      let maxImages = 0;
+      if (currentModel === 'sora2') maxImages = 1;
+      else if (currentModel === 'veo_3_1-fast') maxImages = 2;
+      
+      referenceImages = allReferences.slice(0, maxImages);
     }
     
     const isRefValid = referenceImage && typeof referenceImage === 'string' && referenceImage.startsWith('data:');
@@ -251,6 +281,7 @@ const NodeCard = React.memo(({
             handleGenerate={handleGenerate} 
             textInputLabel={null} 
             imageInputs={linkedSources.imageInputs} 
+            linkedSources={linkedSources}
             generateText={apiFunctions.generateText}
           />
         )}

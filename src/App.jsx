@@ -232,19 +232,27 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
     let referenceImages = []; 
     if (node.type === 'image') {
         // 支持多张参考图：使用所有连接的图片节点的图片
-        referenceImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
+        // 优先使用涂鸦图片(doodleImage)，如果没有则使用生成的基础图片(generatedImage)
+        referenceImages = imageInputNodes.map(n => n.data.doodleImage || n.data.generatedImage).filter(img => img);
         // 向后兼容：如果只有一张参考图，使用单参考图模式
         if (referenceImages.length > 0) referenceImage = referenceImages[0];
-        else if (node.data.generatedImage) referenceImage = node.data.generatedImage;
+        else if (node.data.generatedImage) referenceImage = node.data.doodleImage || node.data.generatedImage;
     } else if (node.type === 'video') {
         // 支持图片节点和视频节点作为输入源
-        referenceImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
+        // 优先使用涂鸦图片(doodleImage)，如果没有则使用生成的基础图片(generatedImage)
+        referenceImages = imageInputNodes.map(n => n.data.doodleImage || n.data.generatedImage).filter(img => img);
         
-        // 处理视频节点输入：提取视频的最后一帧作为参考图
+        // 处理视频节点输入：优先使用截取帧，其次使用缓存的尾帧，最后尝试实时提取尾帧
         if (videoInputNodes.length > 0) {
             for (const videoNode of videoInputNodes) {
-                if (videoNode.data.videoUrl) {
-                    // 提取视频最后一帧的逻辑
+                if (videoNode.data.capturedFrame) {
+                    // 1. 优先使用用户截取的帧
+                    referenceImages.push(videoNode.data.capturedFrame);
+                } else if (videoNode.data.lastFrame) {
+                    // 2. 其次使用缓存的尾帧
+                    referenceImages.push(videoNode.data.lastFrame);
+                } else if (videoNode.data.videoUrl) {
+                    // 3. 最后尝试实时提取视频最后一帧
                     const lastFrameImage = await extractLastFrameFromVideo(videoNode.data.videoUrl);
                     if (lastFrameImage) {
                         referenceImages.push(lastFrameImage);
@@ -2707,23 +2715,6 @@ export default function InfiniteCanvasApp() {
     };
   }, []);
 
-  // 全局阻止浏览器默认缩放行为
-  useEffect(() => {
-    const handleWheel = (e) => {
-      // 如果在画布区域内，并且按住Ctrl键，阻止浏览器默认缩放
-      if (e.ctrlKey) {
-        e.preventDefault();
-      }
-    };
-    
-    // 捕获阶段阻止，确保在浏览器处理之前拦截
-    window.addEventListener('wheel', handleWheel, { passive: false, capture: true });
-    
-    return () => {
-      window.removeEventListener('wheel', handleWheel, { capture: true });
-    };
-  }, []);
-
   if (isLoading) return <div className="flex items-center justify-center h-screen w-full bg-[#f3f4f6] text-gray-500">Loading...</div>;
 
   return (
@@ -2806,21 +2797,7 @@ export default function InfiniteCanvasApp() {
         </div>
       )}
       
-      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={(e) => { 
-        // 阻止浏览器默认缩放行为
-        if (e.ctrlKey || e.cancelable) { 
-          e.preventDefault(); 
-        }
-        
-        if (e.ctrlKey) {
-          // Ctrl+滚轮缩放画布
-          const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-          setScale(s => Math.max(0.1, Math.min(3, s * zoomFactor)));
-        } else {
-          // 普通滚轮滚动画布
-          setOffset(p => ({ x: p.x, y: p.y - e.deltaY }));
-        }
-      }} tabIndex={0}>
+      <div ref={containerRef} className="flex-1 w-full h-full relative bg-[#f8f9fa] cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} tabIndex={0}>
          <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#d1d5db 1.5px, transparent 1.5px)', opacity: 0.6 }} />
          <div className="absolute inset-0 origin-top-left will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
             <svg className="absolute inset-0 overflow-visible pointer-events-none w-full h-full" style={{ zIndex: 0 }}>

@@ -33,6 +33,10 @@ export const DrawingCanvas = ({
 
   const brushSizes = [1, 3, 5, 8, 12];
 
+  const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  const [displaySize, setDisplaySize] = useState({ width: 0, height: 0 });
+  const imageElementRef = useRef(null);
+
   // 当工具或设置改变时，更新画布状态
   useEffect(() => {
     if (!isCanvasReady || !canvasRef.current) return;
@@ -76,12 +80,13 @@ export const DrawingCanvas = ({
       
       img.onload = () => {
         // 设置画布尺寸
-        const maxWidth = window.innerWidth * 0.8;
-        const maxHeight = window.innerHeight * 0.6;
+        const maxWidth = window.innerWidth * 0.9;
+        const maxHeight = window.innerHeight * 0.8;
         
         let canvasWidth = img.width;
         let canvasHeight = img.height;
         
+        // 计算适应屏幕的尺寸
         if (canvasWidth > maxWidth) {
           canvasHeight = (maxWidth / canvasWidth) * canvasHeight;
           canvasWidth = maxWidth;
@@ -92,20 +97,23 @@ export const DrawingCanvas = ({
           canvasHeight = maxHeight;
         }
         
+        // 保存显示尺寸和原始图片对象
+        setDisplaySize({ width: canvasWidth, height: canvasHeight });
+        setImageSize({ width: img.width, height: img.height });
+        imageElementRef.current = img;
+
         canvas.width = canvasWidth;
         canvas.height = canvasHeight;
-        canvas.style.width = canvasWidth + 'px';
-        canvas.style.height = canvasHeight + 'px';
         
-        // 清除画布并绘制图片
+        // 清除画布（保持透明，只绘制笔触）
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
         
         // 初始化绘制设置
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         
         setIsCanvasReady(true);
+        // 保存初始空白状态到历史
         saveToHistory();
       };
       
@@ -184,8 +192,24 @@ export const DrawingCanvas = ({
   };
 
   const handleSave = () => {
-    if (canvasRef.current) {
-      const dataUrl = canvasRef.current.toDataURL();
+    if (canvasRef.current && imageElementRef.current) {
+      // 创建一个临时画布来合并图片和笔触
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d');
+      const canvas = canvasRef.current;
+      
+      // 设置临时画布尺寸为当前画布尺寸（即显示尺寸）
+      // 注意：如果需要保存原图分辨率，这里需要更复杂的逻辑来缩放笔触
+      tempCanvas.width = canvas.width;
+      tempCanvas.height = canvas.height;
+      
+      // 1. 绘制背景图片
+      tempCtx.drawImage(imageElementRef.current, 0, 0, tempCanvas.width, tempCanvas.height);
+      
+      // 2. 绘制笔触层
+      tempCtx.drawImage(canvas, 0, 0);
+      
+      const dataUrl = tempCanvas.toDataURL();
       onSave(dataUrl);
     }
   };
@@ -232,10 +256,20 @@ export const DrawingCanvas = ({
 
       {/* Canvas Area */}
       <div className="relative w-full h-full p-8 flex items-center justify-center overflow-hidden bg-black">
-        <div className="relative select-none max-w-full max-h-full flex items-center justify-center">
+        <div className="relative select-none max-w-full max-h-full flex items-center justify-center"
+             style={{ width: displaySize.width, height: displaySize.height }}>
+            {/* 底层背景图片 */}
+            <img 
+              src={imageSrc} 
+              alt="Background" 
+              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+              style={{ width: '100%', height: '100%' }}
+            />
+            
+            {/* 上层绘图画布 - 透明背景 */}
             <canvas
               ref={canvasRef}
-              className="cursor-crosshair shadow-2xl"
+              className="absolute inset-0 cursor-crosshair z-10"
               onMouseDown={(e) => {
                 e.stopPropagation();
                 startDrawing(e);
@@ -264,7 +298,7 @@ export const DrawingCanvas = ({
                 e.stopPropagation();
                 handleTouchEnd(e);
               }}
-              style={{ touchAction: 'none', maxWidth: '90vw', maxHeight: '80vh' }}
+              style={{ width: '100%', height: '100%', touchAction: 'none' }}
             />
         </div>
       </div>

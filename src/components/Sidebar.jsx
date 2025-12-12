@@ -20,6 +20,17 @@ export const Sidebar = React.memo(({
       
       {/* 菜单项容器 */}
       <div className="relative flex flex-col gap-1 px-3">
+        {/* 快速添加按钮 - 保持原有样式 */}
+        <div className="relative flex justify-center mb-1">
+          <button 
+            onClick={onShowTemplateList}
+            className="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110 hover:shadow-xl"
+            title="快速添加"
+          >
+            <Plus size={18} strokeWidth={3} />
+          </button>
+        </div>
+
         {[
           { id: 'project', icon: FolderKanban, label: '项目', action: onShowProjectMenu }, 
           { id: 'text', icon: Type, label: '文本', action: () => onAdd('text') }, 
@@ -45,22 +56,6 @@ export const Sidebar = React.memo(({
             </div>
           </div>
         ))}
-      </div>
-      
-      {/* 底部分隔线 */}
-      <div className="flex justify-center mt-3 px-6">
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent"></div>
-      </div>
-      
-      {/* 底部添加按钮 */}
-      <div className="relative flex justify-center pb-2">
-        <button 
-          onClick={() => onAdd('image')}
-          className="relative w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center shadow-lg transform transition-all duration-300 hover:scale-110 hover:shadow-xl"
-          title="快速添加"
-        >
-          <Plus size={18} strokeWidth={3} />
-        </button>
       </div>
     </div>
   </div>
