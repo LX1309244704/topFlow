@@ -29,6 +29,19 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
       setLoading(false);
     }
   };
+
+  const handleDeleteItem = async (e, id) => {
+    e.stopPropagation();
+    if (window.confirm('确定要删除这条记录吗？')) {
+        try {
+        await indexedDBManager.deleteHistoryItem(id);
+        // Remove from local state
+        setHistoryItems(prev => prev.filter(item => item.id !== id));
+        } catch (error) {
+        console.error('Failed to delete history item:', error);
+        }
+    }
+  };
   
   // Dynamic positioning logic
   const containerStyle = position ? {
@@ -98,6 +111,16 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
                     {historyItems.map((item) => (
                         <div key={item.id} className="group relative bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all hover:shadow-lg">
                             <div className="aspect-square bg-zinc-950 relative overflow-hidden">
+                                {/* Delete button */}
+                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                    <button 
+                                        onClick={(e) => handleDeleteItem(e, item.id)}
+                                        className="p-1.5 bg-zinc-900/80 hover:bg-red-900/90 rounded-full text-zinc-400 hover:text-zinc-100 backdrop-blur-sm transition-colors border border-zinc-800"
+                                        title="删除"
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                </div>
                                 {activeTab === 'image' ? (
                                     <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
                                 ) : (

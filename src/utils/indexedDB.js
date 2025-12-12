@@ -194,6 +194,21 @@ class IndexedDBManager {
       });
   }
 
+  // 删除单条历史记录
+  async deleteHistoryItem(id) {
+    if (!this.db) await this.init();
+    
+    return new Promise((resolve, reject) => {
+      const transaction = this.db.transaction(['generation_history'], 'readwrite');
+      const store = transaction.objectStore('generation_history');
+      
+      const request = store.delete(id);
+      
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
   // 保存项目数据
   async saveProject(projectData) {
     if (!this.db) await this.init();

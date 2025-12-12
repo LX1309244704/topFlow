@@ -1335,6 +1335,19 @@ export default function InfiniteCanvasApp() {
 
       // 处理生成结果
       if (success && imageUrl) {
+        // 保存到历史记录
+        indexedDBManager.saveToHistory({
+            type: 'image',
+            url: imageUrl,
+            prompt: node.data.prompt,
+            model: node.data.model || 'nano-banana',
+            ratio: node.data.ratio,
+            metadata: {
+                source: 'storyboard',
+                nodeId: node.id
+            }
+        }).catch(err => console.error('Failed to save storyboard image to history:', err));
+
         // 更新节点状态 - 成功生成后显示图片
         handleUpdateWorkflowFixed(
           prevNodes => prevNodes.map(n => 
@@ -1762,6 +1775,20 @@ export default function InfiniteCanvasApp() {
 
     // 处理生成结果
     if (success && imageUrl) {
+      // 保存到历史记录
+      indexedDBManager.saveToHistory({
+          type: 'image',
+          url: imageUrl,
+          prompt: gridPrompt, // 使用完整的gridPrompt
+          model: newNode.data.model || 'nano-banana',
+          ratio: newNode.data.ratio,
+          metadata: {
+              source: 'grid',
+              nodeId: newNodeId,
+              gridDetails: processedDetails
+          }
+      }).catch(err => console.error('Failed to save grid image to history:', err));
+
       // 更新节点状态 - 生成成功后显示图片
       handleUpdateWorkflowFixed(
         prevNodes => prevNodes.map(n => 
