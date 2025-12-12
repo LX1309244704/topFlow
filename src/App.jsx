@@ -2536,6 +2536,30 @@ export default function InfiniteCanvasApp() {
     }, es => es);
   }, [nodes, edges, handleUpdateWorkflowFixed]);
 
+  // --- Connection Handlers ---
+  const onConnectStart = useCallback((nodeId, e) => { e.stopPropagation(); setConnecting({ nodeId }); setMousePos(getHandlePosition(nodeId, 'source', nodes)); setMenu(null); }, [nodes]);
+  const onConnectEnd = useCallback((targetId, e) => { 
+    e.stopPropagation(); 
+    if (connecting && connecting.nodeId !== targetId) { 
+      // 检查是否已经存在相同的连接
+      const existingEdge = edges.find(edge => 
+        edge.source === connecting.nodeId && edge.target === targetId
+      );
+      
+      // 如果已经存在相同的连接，则不创建新连接
+      if (!existingEdge) {
+        // 生成唯一的边ID，使用时间戳确保唯一性
+        const uniqueEdgeId = `edge-${connecting.nodeId}-${targetId}-${Date.now()}`;
+        handleUpdateWorkflow(null, es => [...es, { id: uniqueEdgeId, source: connecting.nodeId, target: targetId }]); 
+      } else {
+        // 可选：显示提示信息告知用户连接已存在
+        console.log('连接已存在，不创建重复连接');
+      }
+    } 
+    setConnecting(null); 
+  }, [connecting, handleUpdateWorkflow, edges]);
+  const removeEdge = useCallback((id) => { handleUpdateWorkflow(ns => ns, es => es.filter(e => e.id !== id)); }, [handleUpdateWorkflow]);
+
   // --- Mouse Handlers ---
   const handleMouseDown = useCallback((e) => {
      if ((e.button === 0 && !e.shiftKey) || e.button === 1) {
@@ -2562,7 +2586,7 @@ export default function InfiniteCanvasApp() {
      }
   }, [connecting, dragState, scale, screenToCanvas, handleUpdateWorkflowFixed]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e) => {
       if (dragState?.type === 'select') {
           const r = { x: Math.min(dragState.startX, dragState.currentX), y: Math.min(dragState.startY, dragState.currentY), w: Math.abs(dragState.currentX - dragState.startX), h: Math.abs(dragState.currentY - dragState.startY) };
           const cR = { x: (r.x - offset.x) / scale, y: (r.y - offset.y) / scale, w: r.w / scale, h: r.h / scale };
@@ -2570,13 +2594,34 @@ export default function InfiniteCanvasApp() {
           nodes.forEach(n => { if (n.x < cR.x + cR.w && n.x + NODE_WIDTHS[n.type] > cR.x && n.y < cR.y + cR.h && n.y + getNodeHeight(n) > cR.y) s.add(n.id); });
           setSelectedIds(s);
       } else if (connecting) {
+          // Check if mouse is dropped on a node (snapping)
+          // Use current event position for accuracy instead of potentially lagged state
+          const currentPos = screenToCanvas(e.clientX, e.clientY);
+          let targetNodeId = null;
+          for (const n of nodes) {
+              const w = getNodeWidth(n);
+              const h = getNodeHeight(n);
+              
+              if (currentPos.x >= n.x && currentPos.x <= n.x + w &&
+                  currentPos.y >= n.y && currentPos.y <= n.y + h) {
+                  targetNodeId = n.id;
+                  break;
+              }
+          }
+
+          if (targetNodeId && targetNodeId !== connecting.nodeId) {
+             // Mock event with stopPropagation to satisfy onConnectEnd
+             onConnectEnd(targetNodeId, { stopPropagation: () => {} });
+             return;
+          }
+
           // 获取源节点连接点的位置
           const sourceNodePos = getHandlePosition(connecting.nodeId, 'source', nodes);
           setMenu({ x: sourceNodePos.x + 20, y: sourceNodePos.y, sourceId: connecting.nodeId });
           setConnecting(null);
       }
       setDragState(null);
-  }, [dragState, offset, scale, nodes, connecting, mousePos]);
+  }, [dragState, offset, scale, nodes, connecting, mousePos, onConnectEnd]);
 
   const onNodeSelect = useCallback((e, id) => {
       e.stopPropagation();
@@ -2624,28 +2669,7 @@ export default function InfiniteCanvasApp() {
       }
   }, [selectedIds, nodes]);
 
-  const onConnectStart = useCallback((nodeId, e) => { e.stopPropagation(); setConnecting({ nodeId }); setMousePos(getHandlePosition(nodeId, 'source', nodes)); setMenu(null); }, [nodes]);
-  const onConnectEnd = useCallback((targetId, e) => { 
-    e.stopPropagation(); 
-    if (connecting && connecting.nodeId !== targetId) { 
-      // 检查是否已经存在相同的连接
-      const existingEdge = edges.find(edge => 
-        edge.source === connecting.nodeId && edge.target === targetId
-      );
-      
-      // 如果已经存在相同的连接，则不创建新连接
-      if (!existingEdge) {
-        // 生成唯一的边ID，使用时间戳确保唯一性
-        const uniqueEdgeId = `edge-${connecting.nodeId}-${targetId}-${Date.now()}`;
-        handleUpdateWorkflow(null, es => [...es, { id: uniqueEdgeId, source: connecting.nodeId, target: targetId }]); 
-      } else {
-        // 可选：显示提示信息告知用户连接已存在
-        console.log('连接已存在，不创建重复连接');
-      }
-    } 
-    setConnecting(null); 
-  }, [connecting, handleUpdateWorkflow, edges]);
-  const removeEdge = useCallback((id) => { handleUpdateWorkflow(ns => ns, es => es.filter(e => e.id !== id)); }, [handleUpdateWorkflow]);
+
   
   const handleKeyDown = useCallback((e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;

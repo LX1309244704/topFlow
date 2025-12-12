@@ -234,7 +234,18 @@ const NodeCard = React.memo(({
   }[node.type];
 
   return (
-    <div className={`absolute flex flex-col transition-shadow duration-200 ease-out group ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} onMouseDown={handleMouseDown}>
+    <div 
+      className={`absolute flex flex-col transition-shadow duration-200 ease-out group ${isSelected ? 'shadow-2xl z-50' : 'shadow-md'}`} 
+      style={{ left: node.x, top: node.y, width, zIndex: isSelected || isExpanded ? 50 : 10 }} 
+      onMouseDown={handleMouseDown}
+      onMouseUp={(e) => {
+        // 如果正在连接中，且释放鼠标在节点上，则触发连接结束
+        // 注意：onConnectEnd 需要处理这种情况，通常它需要知道目标节点的 ID
+        if (onConnectEnd) {
+          onConnectEnd(node.id, e);
+        }
+      }}
+    >
       <HandlePoint type="target" top={handleY} onMouseUp={(e) => onConnectEnd(node.id, e)} />
       <HandlePoint type="source" top={handleY} onMouseDown={(e) => onConnectStart(node.id, e)} />
       
