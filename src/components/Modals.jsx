@@ -13,6 +13,7 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
   const [activeTab, setActiveTab] = useState('image'); // 'image' or 'video'
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
   
   useEffect(() => {
     loadHistory(activeTab);
@@ -30,15 +31,21 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
     }
   };
 
-  const handleDeleteItem = async (e, id) => {
+  const handleDeleteItem = (e, id) => {
     e.stopPropagation();
-    if (window.confirm('确定要删除这条记录吗？')) {
+    setItemToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (itemToDelete) {
         try {
-        await indexedDBManager.deleteHistoryItem(id);
-        // Remove from local state
-        setHistoryItems(prev => prev.filter(item => item.id !== id));
+            await indexedDBManager.deleteHistoryItem(itemToDelete);
+            // Remove from local state
+            setHistoryItems(prev => prev.filter(item => item.id !== itemToDelete));
         } catch (error) {
-        console.error('Failed to delete history item:', error);
+            console.error('Failed to delete history item:', error);
+        } finally {
+            setItemToDelete(null);
         }
     }
   };
@@ -58,6 +65,38 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
   return (
     <div className="fixed inset-0 z-[200] animate-in fade-in duration-300" onClick={onClose}>
       <div className="absolute bg-zinc-950 rounded-xl shadow-2xl w-[380px] max-w-full h-[500px] border border-zinc-800 animate-in fade-in zoom-in-50 duration-300 flex flex-col" style={containerStyle} onClick={e => e.stopPropagation()}>
+        {/* Minimalist Delete Confirmation Overlay */}
+        {itemToDelete && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center animate-in fade-in duration-200 rounded-xl bg-black/60 backdrop-blur-[1px]">
+                <div 
+                    className="w-[240px] bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl p-4 animate-in zoom-in-95 duration-200" 
+                    onClick={e => e.stopPropagation()}
+                >
+                    <div className="text-center mb-4">
+                        <h3 className="text-sm font-medium text-zinc-200 mb-1">确认删除</h3>
+                        <p className="text-[11px] text-zinc-500 leading-relaxed">
+                            确定要删除这条记录吗？
+                        </p>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                        <button 
+                            onClick={() => setItemToDelete(null)}
+                            className="flex-1 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900 rounded-lg transition-colors border border-transparent hover:border-zinc-800"
+                        >
+                            取消
+                        </button>
+                        <button 
+                            onClick={confirmDelete}
+                            className="flex-1 py-1.5 text-xs text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors shadow-sm"
+                        >
+                            删除
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm rounded-t-2xl">
             <div className="flex items-center gap-3">
