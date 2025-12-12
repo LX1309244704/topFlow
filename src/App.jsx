@@ -311,7 +311,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                     ratio: selectedRatio,
                     metadata: {
                         source: 'batch',
-                        nodeId: n.id
+                        nodeId: node.id
                     }
                 }).catch(err => console.error('Failed to save batch image to history:', err));
 
@@ -365,8 +365,8 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                     type: 'video',
                     url: videoUrl,
                     prompt: promptFromSource || node.data.prompt,
-                    model: selectedModel,
-                    ratio: selectedRatio,
+                    model: node.data.model || 'sora2',
+                    ratio: node.data.ratio || '16:9',
                     metadata: {
                         nodeId: node.id
                     }

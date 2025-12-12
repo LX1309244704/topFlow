@@ -1032,9 +1032,6 @@ ${node.data.prompt}
     const event = e || { stopPropagation: () => {} };
     const mode = node.data.mode || "generate";
     
-    // 立即设置生成状态，确保用户立即看到反馈
-    updateNode(node.id, { data: { ...node.data, isGenerating: true } });
-    
     switch (mode) {
       case "storyboard":
         handleStoryboard();
