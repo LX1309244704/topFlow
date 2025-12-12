@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop, Clock } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { DrawingCanvas } from './DrawingCanvas.jsx';
 import { FrameCropper } from './FrameCropper.jsx';
@@ -132,6 +132,17 @@ const BatchSizeSelector = ({ value, onChange, options = [
     value={value} 
     options={options} 
     icon={Layers} 
+    onChange={v => onChange(parseInt(v))} 
+    className="w-16" 
+  />
+);
+
+// 共用的时长选择器组件
+const DurationSelector = ({ value, onChange, options }) => (
+  <NodeSelect 
+    value={value} 
+    options={options} 
+    icon={Clock} 
     onChange={v => onChange(parseInt(v))} 
     className="w-16" 
   />
@@ -1583,6 +1594,27 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
     }
   };
 
+  // 视频时长选项
+  const durationOptions = React.useMemo(() => {
+    const model = node.data.model || "sora2";
+    if (model === "veo_3_1-fast") {
+      return [{ value: 8, label: "8s" }];
+    }
+    // Sora2 and others
+     return [
+       { value: 10, label: "10s" },
+       { value: 15, label: "15s" }
+     ];
+   }, [node.data.model]);
+
+  // 确保时长值有效
+  useEffect(() => {
+    const validValues = durationOptions.map(o => o.value);
+    if (!node.data.duration || !validValues.includes(node.data.duration)) {
+       updateNode(node.id, { data: { ...node.data, duration: durationOptions[0].value } });
+    }
+  }, [node.data.model, durationOptions, node.data.duration, node.id, updateNode]);
+
   const fileRef = useRef(null);
   const videoRef = useRef(null);
   const [showSceneDirector, setShowSceneDirector] = useState(false);
@@ -2158,6 +2190,11 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
               {value:"3:4",label:"3:4"},
               {value:"1:1",label:"1:1"}
             ]}
+          />
+          <DurationSelector 
+            value={node.data.duration || durationOptions[0].value}
+            options={durationOptions}
+            onChange={v => updateNode(node.id, { data: { ...node.data, duration: v } })}
           />
           <BatchSizeSelector 
             value={node.data.batchSize || 1} 
