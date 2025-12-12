@@ -3,6 +3,7 @@ import { X, ChevronDown, ImageIcon, Video, Music, FileText, Zap } from 'lucide-r
 import { HandlePoint } from './UI.jsx';
 import { ImageContent, TextContent, VideoContent, AudioContent } from './NodeContent.jsx';
 import { NODE_WIDTHS } from '../constants.js';
+import { indexedDBManager } from '../utils/indexedDB.js';
 
 const NodeCard = React.memo(({ 
   node, 
@@ -116,6 +117,19 @@ const NodeCard = React.memo(({
         
         // 如果API成功返回图片
         if (url && url !== null && url !== undefined) {
+            // 保存到历史记录
+            indexedDBManager.saveToHistory({
+                type: 'image',
+                url: url,
+                prompt: prompt,
+                model: selectedModel,
+                ratio: selectedRatio,
+                metadata: {
+                    source: 'node',
+                    nodeId: node.id
+                }
+            }).catch(err => console.error('Failed to save node image to history:', err));
+
             setTimeout(() => {
                 updateNode(node.id, { data: { ...node.data, isGenerating: false, generatedImage: url, usingReference: false } });
             }, 500); 

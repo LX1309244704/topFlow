@@ -8,7 +8,7 @@ import apiClient from './api/client';
 import { createBatchNodes } from './utils/workflow';
 import { AudioContent, TextContent, ImageContent, VideoContent } from './components/NodeContent.jsx';
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
-import { AssetModal, SaveProjectModal, ProjectMenu } from './components/Modals.jsx';
+import { AssetModal, SaveProjectModal, ProjectMenu, HistoryModal } from './components/Modals.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { CreationMenu, TemplateListModal } from './components/TemplateComponents.jsx';
 import { indexedDBManager } from './utils/indexedDB';
@@ -302,6 +302,19 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
             
             // 如果API成功返回图片
             if (url && url !== null && url !== undefined) {
+                // 保存到历史记录
+                indexedDBManager.saveToHistory({
+                    type: 'image',
+                    url: url,
+                    prompt: prompt,
+                    model: selectedModel,
+                    ratio: selectedRatio,
+                    metadata: {
+                        source: 'batch',
+                        nodeId: n.id
+                    }
+                }).catch(err => console.error('Failed to save batch image to history:', err));
+
                 setTimeout(() => {
                     updateNode(node.id, { data: { ...node.data, isGenerating: false, generatedImage: url, usingReference: false } });
                 }, 500); 
@@ -347,6 +360,18 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                     node.data.duration || 10
                 );
                 
+                // 保存到历史记录
+                indexedDBManager.saveToHistory({
+                    type: 'video',
+                    url: videoUrl,
+                    prompt: promptFromSource || node.data.prompt,
+                    model: selectedModel,
+                    ratio: selectedRatio,
+                    metadata: {
+                        nodeId: node.id
+                    }
+                }).catch(err => console.error('Failed to save video to history:', err));
+
                 updateNode(node.id, { 
                     data: { 
                         ...node.data, 
@@ -894,6 +919,11 @@ export default function InfiniteCanvasApp() {
   }, []);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [showProjectMenu, setShowProjectMenu] = useState(false); 
+  const [projectMenuPos, setProjectMenuPos] = useState(null);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyModalPos, setHistoryModalPos] = useState(null);
+  const [showAssetModal, setShowAssetModal] = useState(false);
+  const [assetModalPos, setAssetModalPos] = useState(null);
   const [synopsisData, setSynopsisData] = useState(null);
   const [showTemplateList, setShowTemplateList] = useState(false);
   const [networkError, setNetworkError] = useState(false);
@@ -988,7 +1018,7 @@ export default function InfiniteCanvasApp() {
     return true;
   }, [userApiKey, validateApiKey]);
   const [showSaveProjectModal, setShowSaveProjectModal] = useState(false);
-  const [showAssetModal, setShowAssetModal] = useState(false);
+  // showAssetModal moved up
   const [savedProjects, setSavedProjects] = useState([]);
 
   // 组件挂载时恢复自动保存的项目
@@ -2090,6 +2120,21 @@ export default function InfiniteCanvasApp() {
                     const mockH = Math.round(mockW / n.data.aspectRatio);
                     const mockUrl = `https://placehold.co/${mockW}x${mockH}/1d4ed8/ffffff?text=${encodedText}`;
                     
+                    if (url) {
+                        // 保存到历史记录
+                        indexedDBManager.saveToHistory({
+                            type: 'image',
+                            url: url,
+                            prompt: n.data.prompt,
+                            model: n.data.model || 'nano-banana',
+                            ratio: n.data.ratio,
+                            metadata: {
+                                source: 'spawn',
+                                nodeId: n.id
+                            }
+                        }).catch(err => console.error('Failed to save spawn image to history:', err));
+                    }
+
                     return { ...curr, data: { ...curr.data, isGenerating: false, generatedImage: url || mockUrl } };
                 }
                 return curr;
@@ -2504,13 +2549,49 @@ export default function InfiniteCanvasApp() {
       {/* 通知系统容器 */}
       <NotificationContainer notifications={notifications} removeNotification={removeNotification} />
       
-      <Sidebar onAdd={addNode} onShowProjectMenu={() => setShowProjectMenu(true)} onShowTemplateList={() => setShowTemplateList(true)} onShowAssetModal={() => setShowAssetModal(true)} />
-      {showProjectMenu && <ProjectMenu onClose={() => setShowProjectMenu(false)} episodes={project.episodes} currentEpisodeId={currentEpisodeId} onUpdateName={handleUpdateEpisodeName} onAddEpisode={handleAddEpisode} onDeleteEpisode={handleDeleteEpisode} onSelectEpisode={handleSwitchEpisode} />}
+      <Sidebar 
+        onAdd={addNode} 
+        onShowProjectMenu={(e) => {
+          if (e && e.currentTarget) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            // Position to the right of the button (rect.right + margin)
+            // Align with top of the button (rect.top)
+            setProjectMenuPos({ x: rect.right + 12, y: rect.top });
+          } else {
+            // Fallback
+            setProjectMenuPos(null);
+          }
+          setShowProjectMenu(true);
+        }} 
+        onShowTemplateList={() => setShowTemplateList(true)} 
+        onShowAssetModal={(e) => {
+          if (e && e.currentTarget) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            // Align with button top, position to the right
+            setAssetModalPos({ x: rect.right + 12, y: rect.top });
+          } else {
+            setAssetModalPos(null);
+          }
+          setShowAssetModal(true);
+        }} 
+        onShowHistory={(e) => {
+          if (e && e.currentTarget) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            // Align with button top, position to the right
+            setHistoryModalPos({ x: rect.right + 12, y: rect.top });
+          } else {
+            setHistoryModalPos(null);
+          }
+          setShowHistoryModal(true);
+        }} 
+      />
+      {showProjectMenu && <ProjectMenu onClose={() => setShowProjectMenu(false)} episodes={project.episodes} currentEpisodeId={currentEpisodeId} onUpdateName={handleUpdateEpisodeName} onAddEpisode={handleAddEpisode} onDeleteEpisode={handleDeleteEpisode} onSelectEpisode={handleSwitchEpisode} position={projectMenuPos} />}
       {showApiKeyModal && <ApiKeyConfigModal onClose={() => setShowApiKeyModal(false)} currentKey={userApiKey} onSave={setUserApiKey} onClear={() => setUserApiKey("")} />}
+      {showHistoryModal && <HistoryModal onClose={() => setShowHistoryModal(false)} position={historyModalPos} />}
       {synopsisData && <SynopsisDisplayModal onClose={() => setSynopsisData(null)} synopsisData={synopsisData} />}
       {showTemplateList && <TemplateListModal onClose={() => setShowTemplateList(false)} onSelectTemplate={handleSelectTemplate} />}
       {showSaveProjectModal && <SaveProjectModal onClose={() => setShowSaveProjectModal(false)} onSave={handleSaveProject} projectData={{ nodes, edges }} />}
-      {showAssetModal && <AssetModal onClose={() => setShowAssetModal(false)} projects={savedProjects} onLoadProject={handleLoadProject} onDeleteProject={handleDeleteProject} />}
+      {showAssetModal && <AssetModal onClose={() => setShowAssetModal(false)} projects={savedProjects} onLoadProject={handleLoadProject} onDeleteProject={handleDeleteProject} position={assetModalPos} />}
       
       {/* 项目加载动画 */}
       {isProjectLoading && (

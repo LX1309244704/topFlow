@@ -6,6 +6,121 @@ import {
 import apiClient from '../api/client';
 import { Button } from './UI.jsx';
 
+import { indexedDBManager } from '../utils/indexedDB.js';
+
+// 生成历史模态框
+export const HistoryModal = React.memo(({ onClose, position }) => {
+  const [activeTab, setActiveTab] = useState('image'); // 'image' or 'video'
+  const [historyItems, setHistoryItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  
+  useEffect(() => {
+    loadHistory(activeTab);
+  }, [activeTab]);
+  
+  const loadHistory = async (type) => {
+    setLoading(true);
+    try {
+      const items = await indexedDBManager.getHistory(type);
+      setHistoryItems(items);
+    } catch (error) {
+      console.error('Failed to load history:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Dynamic positioning logic
+  const containerStyle = position ? {
+    left: `${position.x}px`,
+    top: `${position.y + 20}px`, // Center of the button (assuming 40px height)
+    transform: 'translateY(-50%)', // Vertically center the modal
+    margin: 0 // Override centered margin
+  } : {
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)'
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] animate-in fade-in duration-300" onClick={onClose}>
+      <div className="absolute bg-zinc-950 rounded-xl shadow-2xl w-[380px] max-w-full h-[500px] border border-zinc-800 animate-in fade-in zoom-in-50 duration-300 flex flex-col" style={containerStyle} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex justify-between items-center px-6 py-4 border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-sm rounded-t-2xl">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-zinc-800 rounded-lg">
+                    <BookOpenText size={20} className="text-zinc-200" />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-zinc-100">生成历史</h2>
+                    <p className="text-xs text-zinc-500">查看所有生成的图片和视频记录</p>
+                </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-zinc-200 transition-colors">
+                <X size={20} />
+            </button>
+        </div>
+        
+        {/* Tabs */}
+        <div className="flex items-center px-6 py-2 border-b border-zinc-800 gap-4 bg-zinc-950">
+            <button 
+                onClick={() => setActiveTab('image')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'image' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                <ImageIcon size={16} />
+                图片历史
+            </button>
+            <button 
+                onClick={() => setActiveTab('video')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${activeTab === 'video' ? 'bg-zinc-800 text-zinc-100' : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-900'}`}
+            >
+                <Video size={16} />
+                视频历史
+            </button>
+        </div>
+        
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6 bg-zinc-950">
+            {loading ? (
+                <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-3">
+                    <div className="w-8 h-8 border-4 border-zinc-800 border-t-zinc-400 rounded-full animate-spin"></div>
+                    <p className="text-sm">加载中...</p>
+                </div>
+            ) : historyItems.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-4">
+                    <div className="w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center">
+                        {activeTab === 'image' ? <ImageIcon size={32} /> : <Video size={32} />}
+                    </div>
+                    <p>暂无{activeTab === 'image' ? '图片' : '视频'}生成记录</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 gap-3">
+                    {historyItems.map((item) => (
+                        <div key={item.id} className="group relative bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all hover:shadow-lg">
+                            <div className="aspect-square bg-zinc-950 relative overflow-hidden">
+                                {activeTab === 'image' ? (
+                                    <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
+                                ) : (
+                                    <video src={item.url} className="w-full h-full object-cover" controls />
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+                                    <p className="text-xs text-zinc-300 line-clamp-2 mb-2">{item.prompt}</p>
+                                    <div className="flex justify-between items-center text-[10px] text-zinc-500">
+                                        <span>{new Date(item.timestamp).toLocaleDateString()}</span>
+                                        <span className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400">{item.ratio}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 // 项目管理模态框
 export const ProjectMenu = React.memo(({ 
   onClose, 
@@ -14,16 +129,27 @@ export const ProjectMenu = React.memo(({
   onUpdateName, 
   onAddEpisode, 
   onDeleteEpisode, 
-  onSelectEpisode 
+  onSelectEpisode,
+  position 
 }) => {
   const [editingId, setEditingId] = useState(null); 
   const handleModalClick = (e) => e.stopPropagation();
   const handleInputBlur = useCallback(() => { setEditingId(null); }, []);
   
+  // Calculate style based on position if provided
+  const style = position ? { 
+    left: `${position.x}px`, 
+    top: `${position.y}px`,
+    transform: 'translateY(-50px)' // Adjust to align better with the button center if needed, or just remove
+  } : { left: '100px', top: '180px' };
+
+  // Remove translateY if we want exact alignment with top
+  if (position) delete style.transform;
+  
   return (
     <div className="fixed inset-0 z-[150]" onMouseDown={onClose}> 
       <div className="absolute inset-0 bg-black/5 pointer-events-none" />
-      <div className="absolute bg-zinc-950 rounded-xl shadow-xl p-6 w-[350px] max-w-full border border-zinc-800 animate-in fade-in slide-in-from-left-4 duration-300" style={{ left: '100px', top: '180px' }} onMouseDown={handleModalClick}>
+      <div className="absolute bg-zinc-950 rounded-xl shadow-xl p-6 w-[350px] max-w-full border border-zinc-800 animate-in fade-in slide-in-from-left-4 duration-300" style={style} onMouseDown={handleModalClick}>
         <div className="flex justify-between items-center border-b border-zinc-900 pb-3 mb-4">
           <h2 className="text-lg font-bold flex items-center gap-2 text-zinc-100">
             <BookOpenText size={20} /> 剧集管理
@@ -528,12 +654,23 @@ const Pagination = React.memo(({ currentPage, totalPages, onPageChange, classNam
 });
 
 // 资产管理模态框
-export const AssetModal = React.memo(({ onClose, projects = [], onLoadProject, onDeleteProject }) => {
+export const AssetModal = React.memo(({ onClose, projects = [], onLoadProject, onDeleteProject, position }) => {
   const tabs = [
     { id: 'projects', label: '项目资产', icon: FolderKanban },
     { id: 'characters', label: '角色库', icon: Users },
     { id: 'materials', label: '素材库', icon: ImageIcon }
   ];
+  
+  // Dynamic positioning logic
+  const containerStyle = position ? {
+    left: `${position.x}px`,
+    top: `${position.y + 20}px`, // Center of the button
+    transform: 'translateY(-50%)', // Vertically center the modal
+    margin: 0
+  } : {
+    left: '100px', 
+    top: '100px'
+  };
   
   const [activeTab, setActiveTab] = useState('projects');
   const [isLoading, setIsLoading] = useState(false);
@@ -860,7 +997,7 @@ export const AssetModal = React.memo(({ onClose, projects = [], onLoadProject, o
   
   return (
     <div className="fixed inset-0 z-[200] animate-in fade-in duration-300" onClick={onClose}>
-      <div className="absolute bg-zinc-950 rounded-2xl shadow-2xl w-[420px] max-w-full max-h-[80vh] border border-zinc-800 animate-in fade-in zoom-in-50 duration-300" style={{ left: '100px', top: '100px' }} onMouseDown={handleModalClick} onClick={e => e.stopPropagation()}>
+      <div className="absolute bg-zinc-950 rounded-2xl shadow-2xl w-[420px] max-w-full max-h-[80vh] border border-zinc-800 animate-in fade-in zoom-in-50 duration-300" style={containerStyle} onMouseDown={handleModalClick} onClick={e => e.stopPropagation()}>
         {/* 头部 */}
         <div className="relative bg-zinc-900/90 border-b border-zinc-800 px-6 py-4 backdrop-blur-sm">
           <div className="flex justify-between items-center">

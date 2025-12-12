@@ -170,6 +170,8 @@ const GenerateButton = ({
   );
 };
 
+import { indexedDBManager } from '../utils/indexedDB.js';
+
 // 图片节点内容组件
 export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
   // 涂鸦相关状态
@@ -226,6 +228,19 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         img.onload = () => {
           const aspect = img.width / img.height;
           updateNode(node.id, { data: { ...node.data, generatedImage: reader.result, aspectRatio: aspect } });
+          
+          // 上传的图片也保存到历史记录
+          indexedDBManager.saveToHistory({
+              type: 'image',
+              url: reader.result,
+              prompt: 'Uploaded Image',
+              model: 'upload',
+              ratio: `${img.width}:${img.height}`,
+              metadata: {
+                  source: 'upload',
+                  nodeId: node.id
+              }
+          }).catch(err => console.error('Failed to save uploaded image to history:', err));
         };
         img.src = reader.result;
       };
@@ -385,6 +400,21 @@ export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         // 调用API生成分镜图片
         const result = await apiClient.generateImage(prompt, hasReferenceImage ? referenceImage : null);
         
+        if (result) {
+            // 保存分镜图片到历史记录
+            indexedDBManager.saveToHistory({
+                type: 'image',
+                url: result,
+                prompt: prompt,
+                model: node.data.model || 'nano-banana',
+                ratio: node.data.ratio || "16:9",
+                metadata: {
+                    source: 'storyboard',
+                    nodeId: nodeId
+                }
+            }).catch(err => console.error('Failed to save storyboard image to history:', err));
+        }
+
         return { success: true, image: result, nodeId };
       } catch (error) {
         lastError = error;

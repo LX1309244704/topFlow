@@ -1,35 +1,36 @@
 import React from 'react';
 import { 
-  Type, ImageIcon, Video, Music, FolderKanban, LayoutTemplate, Plus, Zap
+  Type, ImageIcon, Video, Music, FolderKanban, LayoutTemplate, Plus, Zap, History
 } from 'lucide-react';
 
 export const Sidebar = React.memo(({ 
   onAdd, 
   onShowProjectMenu, 
   onShowTemplateList, 
-  onShowAssetModal 
+  onShowAssetModal,
+  onShowHistory
 }) => (
   <div className="fixed left-6 top-1/2 -translate-y-1/2 z-[100]" onMouseDown={e => e.stopPropagation()}>
     <div className="relative bg-zinc-900/95 backdrop-blur-xl rounded-xl shadow-lg border border-zinc-800 flex flex-col py-2 px-2 gap-1">
       
-      {/* 快速添加按钮 */}
+      {/* 快速添加按钮 -> 改为项目管理 */}
       <div className="relative flex justify-center mb-2 pb-2 border-b border-zinc-800">
         <button 
-          onClick={onShowTemplateList}
+          onClick={(e) => onShowProjectMenu(e)}
           className="relative w-10 h-10 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shadow-sm transition-all duration-200 hover:bg-white hover:scale-105"
-          title="快速添加"
+          title="项目管理"
         >
-          <Plus size={18} />
+          <FolderKanban size={18} />
         </button>
       </div>
 
       {[
-        { id: 'project', icon: FolderKanban, label: '项目', action: onShowProjectMenu }, 
         { id: 'text', icon: Type, label: '文本', action: () => onAdd('text') }, 
         { id: 'image', icon: ImageIcon, label: '图片', action: () => onAdd('image') }, 
         { id: 'video', icon: Video, label: '视频', action: () => onAdd('video') }, 
         { id: 'audio', icon: Music, label: '音频', action: () => onAdd('audio') },
-        { id: 'assets', icon: FolderKanban, label: '资产', action: onShowAssetModal }
+        { id: 'history', icon: History, label: '生成历史', action: (e) => onShowHistory(e) },
+        { id: 'assets', icon: FolderKanban, label: '资产', action: (e) => onShowAssetModal(e) }
       ].map((item) => (
         <div key={item.id} className="relative group">
           <button 
