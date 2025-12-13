@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Plus, X, Key, Save, BookOpenText, Pencil, Trash2, FileText, FolderKanban, Users, ImageIcon,
   LayoutTemplate, Search, ChevronRight, ChevronDown, TestTube, Mountain, Sparkles, Video, Play, Zap
@@ -14,6 +15,26 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
   const [historyItems, setHistoryItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  
+  // 预览状态
+  const [previewItem, setPreviewItem] = useState(null);
+  const [previewPos, setPreviewPos] = useState({ x: 0, y: 0 });
+
+  const handleMouseEnter = (e, item) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    // 智能判断显示位置：如果右侧空间不足，显示在左侧
+    const showOnRight = rect.right + 340 < window.innerWidth;
+    
+    setPreviewPos({
+        x: showOnRight ? rect.right + 10 : rect.left - 330,
+        y: rect.top - 20 // 略微上移
+    });
+    setPreviewItem(item);
+  };
+
+  const handleMouseLeave = () => {
+    setPreviewItem(null);
+  };
   
   useEffect(() => {
     loadHistory(activeTab);
@@ -148,7 +169,12 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
             ) : (
                 <div className="grid grid-cols-2 gap-3">
                     {historyItems.map((item) => (
-                        <div key={item.id} className="group relative bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all hover:shadow-lg">
+                        <div 
+                            key={item.id} 
+                            className="group relative bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all hover:shadow-lg"
+                            onMouseEnter={(e) => handleMouseEnter(e, item)}
+                            onMouseLeave={handleMouseLeave}
+                        >
                             <div className="aspect-square bg-zinc-950 relative overflow-hidden">
                                 {/* Delete button */}
                                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
@@ -163,7 +189,7 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
                                 {activeTab === 'image' ? (
                                     <img src={item.url} alt={item.prompt} className="w-full h-full object-cover" loading="lazy" />
                                 ) : (
-                                    <video src={item.url} className="w-full h-full object-cover" controls />
+                                    <video src={item.url} className="w-full h-full object-cover" muted loop />
                                 )}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                                     <p className="text-xs text-zinc-300 line-clamp-2 mb-2">{item.prompt}</p>
@@ -178,6 +204,46 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
                 </div>
             )}
         </div>
+        
+        {/* Preview Portal */}
+        {previewItem && createPortal(
+            <div 
+                className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200"
+                style={{ 
+                    left: previewPos.x, 
+                    top: previewPos.y,
+                    width: '320px',
+                    maxHeight: '400px'
+                }}
+            >
+                <div className="bg-zinc-900 rounded-xl border border-zinc-700 shadow-2xl overflow-hidden p-1">
+                    {activeTab === 'image' ? (
+                        <img 
+                            src={previewItem.url} 
+                            alt="Preview" 
+                            className="w-full h-auto rounded-lg object-contain bg-zinc-950"
+                        />
+                    ) : (
+                        <video 
+                            src={previewItem.url} 
+                            className="w-full h-auto rounded-lg object-contain bg-zinc-950" 
+                            autoPlay 
+                            loop 
+                            muted={false} 
+                            controls 
+                        />
+                    )}
+                    <div className="p-2 bg-zinc-900">
+                        <p className="text-xs text-zinc-300 line-clamp-3 font-medium">{previewItem.prompt}</p>
+                        <div className="flex justify-between items-center mt-2 text-[10px] text-zinc-500">
+                            <span>{new Date(previewItem.timestamp).toLocaleString()}</span>
+                            <span className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 border border-zinc-700">{previewItem.ratio}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
       </div>
     </div>
   );

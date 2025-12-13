@@ -1927,12 +1927,14 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             {node.data.videoUrl ? (
               <>
                 <video 
+                  key={node.data.videoUrl} // Force re-render when URL changes to ensure crossOrigin is applied correctly
                   ref={videoRef}
                   src={node.data.videoUrl} 
                   controls={!showSceneDirector} // 启用Scene Director时隐藏原生控件
                   className="w-full h-full object-cover" 
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
+                  crossOrigin="anonymous"
                 />
                 
                 {/* 截取的帧预览 - 悬浮在右上角 */}
