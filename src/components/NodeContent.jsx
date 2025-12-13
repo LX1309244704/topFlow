@@ -184,10 +184,51 @@ const GenerateButton = ({
 import { indexedDBManager } from '../utils/indexedDB.js';
 
 // 图片节点内容组件
-export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources }) => {
+export const ImageContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, generateText, linkedSources, imageInputs, videoInputs }) => {
   // 涂鸦相关状态
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [editingImageSrc, setEditingImageSrc] = useState(null);
+  const [previewPos, setPreviewPos] = useState({ x: 0, y: 0 });
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+
+  // 获取所有参考图片 - 移除 useMemo 以确保实时更新
+  const referenceImages = [];
+  // 优先使用传入的 imageInputs prop，其次尝试从 linkedSources 获取
+  const inputImageNodes = imageInputs || linkedSources?.imageInputs || [];
+  const inputVideoNodes = videoInputs || linkedSources?.videoInputs || [];
+  
+  // 处理图片输入
+  if (inputImageNodes && inputImageNodes.length > 0) {
+    inputImageNodes.forEach(n => {
+      // 优先使用涂鸦图片，如果没有则使用生成的基础图片
+      const imageToUse = n.data?.doodleImage || n.data?.generatedImage;
+      if (imageToUse) {
+          referenceImages.push({
+          id: n.id,
+          src: imageToUse,
+          type: 'image',
+          isDoodle: !!n.data?.doodleImage
+        });
+      }
+    });
+  }
+
+  // 处理视频输入 (作为参考图)
+  if (inputVideoNodes && inputVideoNodes.length > 0) {
+    inputVideoNodes.forEach(n => {
+       // 尝试获取视频帧
+       const frameToUse = n.data?.capturedFrame || n.data?.lastFrame;
+       if (frameToUse) {
+         referenceImages.push({
+           id: n.id,
+           src: frameToUse,
+           type: 'video-frame',
+           isAutoLastFrame: !n.data?.capturedFrame
+         });
+       }
+    });
+  }
 
   // 分辨率选项 - 根据模型类型提供不同的分辨率选项
   const resolutionOptions = {
@@ -1206,7 +1247,46 @@ ${node.data.prompt}
         )}
       </div>
       <div className={`bg-zinc-950 shadow-md border-x border-b border-zinc-800 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-lg opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-lg'}`} style={{ overflow: 'hidden' }}>
-        {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
+        
+        {/* Reference Images Preview */}
+        {referenceImages.length > 0 && (
+          <div className="flex flex-col gap-2 pb-2 border-b border-zinc-800">
+            <span className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">
+              参考图片 ({referenceImages.length})
+            </span>
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {referenceImages.map((img, idx) => (
+                <div 
+                  key={`${img.id}-${idx}`} 
+                  className="relative group flex-shrink-0 cursor-zoom-in hover:scale-105 transition-all"
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setPreviewPos({ x: rect.left, y: rect.top - 8 });
+                    setPreviewImage(img.src);
+                    setShowPreview(true);
+                  }}
+                  onMouseLeave={() => {
+                    setShowPreview(false);
+                    setPreviewImage(null);
+                  }}
+                >
+                  <div className="h-8 w-auto min-w-[32px] max-w-[60px] bg-zinc-900 rounded overflow-hidden shadow-sm">
+                    <img src={img.src} alt="Ref" className="h-full w-full object-cover" />
+                  </div>
+                  {img.isDoodle && (
+                    <div className="absolute -top-1 -right-1 bg-purple-500/80 rounded-full p-0.5" title="涂鸦修改">
+                      <Brush size={6} className="text-white" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center">
+          {textInputLabel && <InputBadge text={textInputLabel} type="text" />}
+        </div>
         
         <PromptInput 
           value={node.data.prompt || ''} 
@@ -1263,6 +1343,28 @@ ${node.data.prompt}
           onSave={handleDrawingSave}
           imageSrc={editingImageSrc}
         />,
+        document.body
+      )}
+
+      {/* Reference Image Portal Preview */}
+      {showPreview && previewImage && createPortal(
+        <div 
+          className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in duration-200"
+          style={{ 
+            left: previewPos.x, 
+            top: previewPos.y,
+            transform: 'translateY(-100%)',
+            maxWidth: 'min(80vw, 600px)',
+            maxHeight: 'min(80vh, 600px)'
+          }}
+        >
+          <img 
+            src={previewImage} 
+            alt="Reference Large" 
+            className="w-auto h-auto rounded shadow-2xl object-contain"
+            style={{ maxHeight: 'inherit', maxWidth: 'inherit' }}
+          />
+        </div>,
         document.body
       )}
 

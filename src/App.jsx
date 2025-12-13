@@ -11,6 +11,7 @@ import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 import { AssetModal, SaveProjectModal, ProjectMenu, HistoryModal } from './components/Modals.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
 import { CreationMenu, TemplateListModal } from './components/TemplateComponents.jsx';
+import SplashScreen from './components/SplashScreen.jsx';
 import { indexedDBManager } from './utils/indexedDB';
 import { NotificationContainer, useNotification } from './components/Notification.jsx';
 
@@ -876,6 +877,7 @@ const SynopsisDisplayModal = React.memo(({ onClose, synopsisData }) => {
 const ApiTest = React.lazy(() => import('./components/ApiTest'));
 
 export default function InfiniteCanvasApp() {
+  const [showSplash, setShowSplash] = useState(true);
   // 通知系统
   const { notifications, removeNotification, success, error, info } = useNotification();
   
@@ -2573,6 +2575,9 @@ export default function InfiniteCanvasApp() {
 
   return (
     <div className="flex flex-col h-screen w-full bg-black overflow-hidden font-sans text-zinc-100 selection:bg-zinc-800">
+      {/* 启动页面 */}
+      {showSplash && <SplashScreen onEnter={() => setShowSplash(false)} />}
+      
       {/* 通知系统容器 */}
       <NotificationContainer notifications={notifications} removeNotification={removeNotification} />
       
@@ -2691,7 +2696,7 @@ export default function InfiniteCanvasApp() {
             </svg>
             {(nodes || []).map(n => {
                 // 去重处理，确保每个源节点只被计算一次
-                const sourceNodes = (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id === e.source)).filter(Boolean);
+                const sourceNodes = (edges||[]).filter(e => e.target === n.id).map(e => nodes.find(src => src.id == e.source)).filter(Boolean);
                 const uniqueSourceIds = new Set();
                 const uniqueSourceNodes = sourceNodes.filter(node => {
                     if (uniqueSourceIds.has(node.id)) return false;
@@ -2704,7 +2709,7 @@ export default function InfiniteCanvasApp() {
                     imageInputs: uniqueSourceNodes.filter(src => src?.type === 'image'),
                     videoInputs: uniqueSourceNodes.filter(src => src?.type === 'video')
                 };
-                return <NodeCard key={n.id} node={n} updateNode={updateNode} isSelected={selectedIds.has(n.id)} onSelect={onNodeSelect} onConnectStart={onConnectStart} onConnectEnd={onConnectEnd} onSpawnNodes={handleSpawnNodes} onDelete={deleteNode} linkedSources={linked} apiFunctions={apiFunctions} onShowAssetModal={() => setShowAssetModal(true)} />;
+                return <NodeCard key={n.id} node={n} updateNode={updateNode} isSelected={selectedIds.has(n.id)} onSelect={onNodeSelect} onConnectStart={onConnectStart} onConnectEnd={onConnectEnd} onSpawnNodes={handleSpawnNodes} onDelete={deleteNode} linkedSources={linked} imageInputs={linked.imageInputs} videoInputs={linked.videoInputs} apiFunctions={apiFunctions} onShowAssetModal={() => setShowAssetModal(true)} />;
             })}
             {menu && <CreationMenu x={menu.x} y={menu.y} onSelect={(t) => { addNode(t, menu.x + 50, menu.y, menu.sourceId); setMenu(null); }} onClose={() => setMenu(null)} />}
          </div>
