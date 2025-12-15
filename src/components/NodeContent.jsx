@@ -1373,7 +1373,7 @@ ${node.data.prompt}
 };
 
 // 文本节点内容组件
-export const TextContent = ({ node, updateNode, generateText, generateStreamText, handleAnalyze, isAnalyzing }) => {
+export const TextContent = ({ node, updateNode, generateText, generateStreamText, generateTextWithImage, imageInputs, handleAnalyze, isAnalyzing }) => {
   const minHeight = 160;
   const currentHeight = node.data.height || minHeight;
   const [localResizing, setLocalResizing] = useState(false);
@@ -1429,11 +1429,14 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
   }, [isWriting, node.data.streamingText]);
 
   const handleAIWrite = async () => {
-    if (!node.data.text || isWriting || isAnalyzing) return;
+    if (isWriting || isAnalyzing) return;
     
     const originalText = node.data.text || '';
     const selectedModel = node.data.model || "gemini-2.5";
     const rolePrompt = node.data.rolePrompt || '';
+    const hasImageInputs = Array.isArray(imageInputs) && imageInputs.length > 0;
+    const refImage = hasImageInputs ? (imageInputs[0].data?.doodleImage || imageInputs[0].data?.generatedImage) : null;
+    const useReversePrompt = !!refImage;
     
     updateNode(node.id, { data: { ...node.data, isWriting: true, streamingText: '' } });
     setDisplayText('');
@@ -1444,7 +1447,32 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
       typingIntervalRef.current = null;
     }
     
-    // 如果有角色提示词，则使用角色提示词格式
+    if (useReversePrompt && generateTextWithImage) {
+      let prompt = rolePrompt && rolePrompt.trim() ? rolePrompt + "\n\n" : "";
+      prompt += "请基于参考图片输出适用于AI图像生成的提示词：\n1) 一行英文关键词，逗号分隔；\n2) 一段中文详细提示词。";
+      const finalText = await generateTextWithImage(prompt, refImage);
+      updateNode(node.id, { 
+        data: { 
+          ...node.data, 
+          text: (originalText ? originalText + "\n\n" : "") + (finalText || ''), 
+          streamingText: '',
+          isWriting: false 
+        } 
+      });
+      setDisplayText('');
+      setCurrentCharIndex(0);
+      if (typingIntervalRef.current) {
+        clearInterval(typingIntervalRef.current);
+        typingIntervalRef.current = null;
+      }
+      return;
+    }
+    
+    if (!originalText) {
+      updateNode(node.id, { data: { ...node.data, isWriting: false } });
+      return;
+    }
+    
     let prompt;
     if (rolePrompt && rolePrompt.trim()) {
       prompt = `${rolePrompt}\n\n请基于以上角色设定，续写以下内容：${originalText}`;

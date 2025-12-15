@@ -447,7 +447,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
         {node.type !== 'text' && <div className="text-[10px] text-zinc-600 font-mono">#{node.id.toString().slice(-4)}</div>}
       </div>
       <div onClick={node.type !== 'text' ? (e) => { e.stopPropagation(); setIsExpanded(true); } : undefined}>
-        {node.type === 'text' && <TextContent node={node} updateNode={updateNode} generateText={apiFunctions.generateText} generateStreamText={apiFunctions.generateStreamText} handleAnalyze={(script) => apiFunctions.handleTextNodeAnalysis(script, node.id)} isAnalyzing={node.data.isAnalyzing}/>}
+        {node.type === 'text' && <TextContent node={node} updateNode={updateNode} generateText={apiFunctions.generateText} generateStreamText={apiFunctions.generateStreamText} generateTextWithImage={apiFunctions.generateTextWithImage} imageInputs={linkedSources.imageInputs} handleAnalyze={(script) => apiFunctions.handleTextNodeAnalysis(script, node.id)} isAnalyzing={node.data.isAnalyzing}/>}
         {node.type === 'image' && <ImageContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} generateText={apiFunctions.generateText}/>}
         {node.type === 'video' && <VideoContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} imageInputs={linkedSources.imageInputs} videoInputs={linkedSources.videoInputs} generateText={apiFunctions.generateText}/>}
         {node.type === 'audio' && <AudioContent node={node} updateNode={updateNode} isExpanded={isExpanded} handleGenerate={handleGenerate} textInputLabel={null} />}
@@ -1878,7 +1878,7 @@ export default function InfiniteCanvasApp() {
     } 
   }, [setShowApiKeyModal, setNetworkError]);
 
-  const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis, checkApiKeyBeforeGenerate }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, handleTextNodeAnalysis, checkApiKeyBeforeGenerate]);
+  const apiFunctions = useMemo(() => ({ userApiKey, generateText, generateStreamText, generateTextWithImage: apiClient.generateTextWithImage, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, setSynopsisData, handleTextNodeAnalysis, checkApiKeyBeforeGenerate }), [userApiKey, generateText, generateStreamText, generateImage, generateImageFromRef, generateSpeech, generateVideo, generateStructuredSynopsis, handleTextNodeAnalysis, checkApiKeyBeforeGenerate]);
   
   // Helper functions for handlers
   const updateNode = useCallback((id, newData) => handleUpdateWorkflowFixed(ns => ns.map(n => n.id === id ? { ...n, ...newData } : n)), [handleUpdateWorkflowFixed]);
@@ -2355,13 +2355,40 @@ export default function InfiniteCanvasApp() {
         // 生成唯一的边ID，使用时间戳确保唯一性
         const uniqueEdgeId = `edge-${connecting.nodeId}-${targetId}-${Date.now()}`;
         handleUpdateWorkflow(null, es => [...es, { id: uniqueEdgeId, source: connecting.nodeId, target: targetId }]); 
+        const sourceNode = (nodes || []).find(n => n.id === connecting.nodeId);
+        const targetNode = (nodes || []).find(n => n.id === targetId);
+        if (sourceNode?.type === 'image' && targetNode?.type === 'text') {
+          const reverseRolePrompt = [
+            "你是一位资深提示词工程师，负责将图片内容反推为适用于AI图像生成的高质量中文提示词。",
+            "请根据参考图片提炼：主体、风格、构图、镜头、光线、色彩、环境与氛围、材质与细节、摄影参数。",
+            "输出两部分：",
+            "1) 英文关键词行（逗号分隔，便于模型识别，如 ultra-detailed, cinematic lighting, 35mm, shallow depth of field, rim light, etc.）。",
+            "2) 中文详细提示词（完整描述画面元素，可直接用于生成）。"
+          ].join("\n");
+          handleUpdateWorkflowFixed(
+            prevNodes => prevNodes.map(n => 
+              n.id === targetId 
+                ? { 
+                    ...n, 
+                    data: { 
+                      ...n.data, 
+                      selectedRole: n.data.selectedRole || "", 
+                      rolePrompt: reverseRolePrompt, 
+                      reversePromptMode: true 
+                    } 
+                  } 
+                : n
+            ),
+            es => es
+          );
+        }
       } else {
         // 可选：显示提示信息告知用户连接已存在
         console.log('连接已存在，不创建重复连接');
       }
     } 
     setConnecting(null); 
-  }, [connecting, handleUpdateWorkflow, edges]);
+  }, [connecting, handleUpdateWorkflow, handleUpdateWorkflowFixed, edges, nodes]);
   const removeEdge = useCallback((id) => { handleUpdateWorkflow(ns => ns, es => es.filter(e => e.id !== id)); }, [handleUpdateWorkflow]);
 
   // --- Mouse Handlers ---

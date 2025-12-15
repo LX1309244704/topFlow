@@ -506,7 +506,9 @@ export const generateGeminiTextWithImage = async (prompt, refImage) => {
   try {
     const endpoint = '/v1beta/models/gemini-2.5-pro:streamGenerateContent';
     
-    // 移除data:image/...;base64,前缀
+    // 解析 mimeType 并移除 dataURL 前缀
+    const mimeMatch = refImage.match(/^data:(.*?);base64,/);
+    const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
     const base64Image = refImage.split(',')[1] || refImage.replace(/^data:image\/\w+;base64,/, '');
     
     // 构建多模态分析请求
@@ -527,7 +529,7 @@ export const generateGeminiTextWithImage = async (prompt, refImage) => {
             },
             {
               inlineData: {
-                mimeType: "image/jpeg",
+                mimeType,
                 data: base64Image
               }
             }
