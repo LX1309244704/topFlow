@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Plus, X, Key, Save, BookOpenText, Pencil, Trash2, FileText, FolderKanban, Users, ImageIcon,
-  LayoutTemplate, Search, ChevronRight, ChevronDown, TestTube, Mountain, Sparkles, Video, Play, Zap
+  LayoutTemplate, Search, ChevronRight, ChevronDown, TestTube, Mountain, Sparkles, Video, Play, Zap, Download
 } from 'lucide-react';
 import apiClient from '../api/client';
 import { Button } from './UI.jsx';
 
 import { indexedDBManager } from '../utils/indexedDB.js';
+import { downloadFile } from '../constants.js';
 
 // 生成历史模态框
 export const HistoryModal = React.memo(({ onClose, position }) => {
@@ -84,7 +85,22 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-[200] animate-in fade-in duration-300" onClick={onClose}>
+    <div 
+      className="fixed inset-0 z-[200] animate-in fade-in duration-300" 
+      onClick={onClose}
+      onDragOver={(e) => { e.preventDefault(); }}
+      onDrop={(e) => { 
+        e.preventDefault();
+        let raw = e.dataTransfer.getData('application/x-topflow-history');
+        if (!raw) raw = e.dataTransfer.getData('text/plain');
+        if (!raw) return;
+        let payload;
+        try { payload = JSON.parse(raw); } catch { return; }
+        if (window.topFlow && typeof window.topFlow.addNodeFromHistory === 'function') {
+          window.topFlow.addNodeFromHistory(e.clientX, e.clientY, payload);
+        }
+      }}
+    >
       <div className="absolute bg-zinc-950 rounded-xl shadow-2xl w-[380px] max-w-full h-[500px] border border-zinc-800 animate-in fade-in zoom-in-50 duration-300 flex flex-col" style={containerStyle} onClick={e => e.stopPropagation()}>
         {/* Minimalist Delete Confirmation Overlay */}
         {itemToDelete && (
@@ -174,6 +190,20 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
                             className="group relative bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden hover:border-zinc-700 transition-all hover:shadow-lg"
                             onMouseEnter={(e) => handleMouseEnter(e, item)}
                             onMouseLeave={handleMouseLeave}
+                            draggable
+                            onDragStart={(e) => {
+                              const payload = {
+                                type: item.type,
+                                url: item.url,
+                                ratio: item.ratio || (item.metadata && item.metadata.aspectRatio) || null,
+                                prompt: item.prompt || ''
+                              };
+                              try {
+                                e.dataTransfer.setData('application/x-topflow-history', JSON.stringify(payload));
+                              } catch {}
+                              e.dataTransfer.setData('text/plain', JSON.stringify(payload));
+                              e.dataTransfer.effectAllowed = 'copy';
+                            }}
                         >
                             <div className="aspect-square bg-zinc-950 relative overflow-hidden">
                                 {/* Delete button */}
@@ -184,6 +214,30 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
                                         title="删除"
                                     >
                                         <Trash2 size={14} />
+                                    </button>
+                                    <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const ext = (() => {
+                                            if (item.type === 'image') {
+                                              const m = (item.url || '').match(/^data:image\/(\w+)/);
+                                              if (m) return m[1] === 'jpeg' ? 'jpg' : m[1];
+                                              const seg = (item.url || '').split('?')[0].split('.').pop();
+                                              return seg && seg.length <= 4 ? seg : 'png';
+                                            } else {
+                                              const m = (item.url || '').match(/^data:video\/(\w+)/);
+                                              if (m) return m[1];
+                                              const seg = (item.url || '').split('?')[0].split('.').pop();
+                                              return seg && seg.length <= 4 ? seg : 'mp4';
+                                            }
+                                          })();
+                                          const fname = `${item.type}_${item.id}.${ext}`;
+                                          downloadFile(item.url, fname);
+                                        }}
+                                        className="ml-2 p-1.5 bg-zinc-900/80 hover:bg-zinc-800 rounded-full text-zinc-400 hover:text-zinc-100 backdrop-blur-sm transition-colors border border-zinc-800"
+                                        title="下载到本地"
+                                    >
+                                        <Download size={14} />
                                     </button>
                                 </div>
                                 {activeTab === 'image' ? (
@@ -238,6 +292,31 @@ export const HistoryModal = React.memo(({ onClose, position }) => {
                         <div className="flex justify-between items-center mt-2 text-[10px] text-zinc-500">
                             <span>{new Date(previewItem.timestamp).toLocaleString()}</span>
                             <span className="bg-zinc-800 px-1.5 py-0.5 rounded text-zinc-400 border border-zinc-700">{previewItem.ratio}</span>
+                        </div>
+                        <div className="mt-2 flex justify-end">
+                          <button
+                            onClick={() => {
+                              const ext = (() => {
+                                if (previewItem.type === 'image') {
+                                  const m = (previewItem.url || '').match(/^data:image\/(\w+)/);
+                                  if (m) return m[1] === 'jpeg' ? 'jpg' : m[1];
+                                  const seg = (previewItem.url || '').split('?')[0].split('.').pop();
+                                  return seg && seg.length <= 4 ? seg : 'png';
+                                } else {
+                                  const m = (previewItem.url || '').match(/^data:video\/(\w+)/);
+                                  if (m) return m[1];
+                                  const seg = (previewItem.url || '').split('?')[0].split('.').pop();
+                                  return seg && seg.length <= 4 ? seg : 'mp4';
+                                }
+                              })();
+                              const fname = `${previewItem.type}_${previewItem.id}.${ext}`;
+                              downloadFile(previewItem.url, fname);
+                            }}
+                            className="px-2 py-1 text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 flex items-center gap-1 border border-zinc-700"
+                          >
+                            <Download size={12} />
+                            下载
+                          </button>
                         </div>
                     </div>
                 </div>

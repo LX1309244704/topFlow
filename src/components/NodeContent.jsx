@@ -1450,7 +1450,7 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
     if (useReversePrompt && generateTextWithImage) {
       let prompt = rolePrompt && rolePrompt.trim() ? rolePrompt + "\n\n" : "";
       prompt += "请基于参考图片输出适用于AI图像生成的提示词：\n1) 一行英文关键词，逗号分隔；\n2) 一段中文详细提示词。";
-      const finalText = await generateTextWithImage(prompt, refImage);
+      const finalText = await generateTextWithImage(prompt, refImage, rolePrompt);
       updateNode(node.id, { 
         data: { 
           ...node.data, 

@@ -106,8 +106,8 @@ export const generateImageFromMultipleRefs = async (prompt, refImages, model, ra
  * @param {string} refImage - 参考图像的Base64数据
  * @returns {Promise<string>} 生成的文本
  */
-export const generateTextWithImage = async (prompt, refImage) => {
-  return await generateGeminiTextWithImage(prompt, refImage);
+export const generateTextWithImage = async (prompt, refImage, rolePrompt) => {
+  return await generateGeminiTextWithImage(prompt, refImage, rolePrompt);
 };
 
 /**

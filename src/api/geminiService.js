@@ -495,7 +495,7 @@ export const generateGeminiImage = async (prompt, model = 'nano-banana', ratio =
  * @param {string} refImage - 参考图像的Base64数据
  * @returns {Promise<string>} 生成的文本
  */
-export const generateGeminiTextWithImage = async (prompt, refImage) => {
+export const generateGeminiTextWithImage = async (prompt, refImage, rolePrompt = "") => {
   console.log('🎨 Gemini多模态分析API调用:', { prompt, hasRefImage: !!refImage });
   
   if (!refImage) {
@@ -516,7 +516,9 @@ export const generateGeminiTextWithImage = async (prompt, refImage) => {
       systemInstruction: {
         parts: [
           {
-            text: "你是一个专业的视觉分析师，能够基于参考图片和用户需求，提供专业的视觉分析和创意建议。请仔细分析图片的视觉元素，包括构图、色彩、风格、主体等，并给出专业的建议。"
+            text: rolePrompt && rolePrompt.trim() 
+              ? rolePrompt 
+              : "你是一个专业的视觉分析师，能够基于参考图片和用户需求，提供专业的视觉分析和创意建议。请仔细分析图片的视觉元素，包括构图、色彩、风格、主体等，并给出专业的建议。"
           }
         ]
       },

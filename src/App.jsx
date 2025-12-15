@@ -2373,7 +2373,7 @@ export default function InfiniteCanvasApp() {
                     data: { 
                       ...n.data, 
                       selectedRole: n.data.selectedRole || "", 
-                      rolePrompt: reverseRolePrompt, 
+                      rolePrompt: (n.data.selectedRole && n.data.selectedRole !== '') ? (n.data.rolePrompt || '') : reverseRolePrompt, 
                       reversePromptMode: true 
                     } 
                   } 
@@ -2481,6 +2481,55 @@ export default function InfiniteCanvasApp() {
     }
   }, [scale, offset]);
 
+  const handleCanvasDragOver = useCallback((e) => {
+    e.preventDefault();
+  }, []);
+
+  const handleCanvasDrop = useCallback((e) => {
+    e.preventDefault();
+    let raw = e.dataTransfer.getData('application/x-topflow-history');
+    if (!raw) raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
+    let payload;
+    try { payload = JSON.parse(raw); } catch { return; }
+    const cPos = screenToCanvas(e.clientX, e.clientY);
+    const type = payload.type === 'video' ? 'video' : 'image';
+    const newId = Date.now();
+    let aspectRatio = null;
+    if (payload.ratio && typeof payload.ratio === 'string' && payload.ratio.includes(':')) {
+      const parts = payload.ratio.split(':').map(Number);
+      if (parts[0] > 0 && parts[1] > 0) aspectRatio = parts[0] / parts[1];
+    }
+    let data = { isGenerating: false };
+    if (type === 'image') {
+      data = { ...data, model: "nano-banana", ratio: "4:3", generatedImage: payload.url, aspectRatio: aspectRatio || 4/3 };
+    } else {
+      data = { ...data, model: "sora2", ratio: "16:9", generatedVideo: true, videoUrl: payload.url, aspectRatio: aspectRatio || 16/9 };
+    }
+    const newNode = { id: newId, type, x: cPos.x - 160, y: cPos.y - 100, data };
+    handleUpdateWorkflowFixed(prevNodes => [...prevNodes, newNode], es => es);
+  }, [screenToCanvas, handleUpdateWorkflowFixed]);
+
+  const addNodeFromHistory = useCallback((clientX, clientY, payload) => {
+    if (!payload || !payload.url) return;
+    const cPos = screenToCanvas(clientX, clientY);
+    const type = payload.type === 'video' ? 'video' : 'image';
+    const newId = Date.now();
+    let aspectRatio = null;
+    if (payload.ratio && typeof payload.ratio === 'string' && payload.ratio.includes(':')) {
+      const parts = payload.ratio.split(':').map(Number);
+      if (parts[0] > 0 && parts[1] > 0) aspectRatio = parts[0] / parts[1];
+    }
+    let data = { isGenerating: false };
+    if (type === 'image') {
+      data = { ...data, model: "nano-banana", ratio: "4:3", generatedImage: payload.url, aspectRatio: aspectRatio || 4/3 };
+    } else {
+      data = { ...data, model: "sora2", ratio: "16:9", generatedVideo: true, videoUrl: payload.url, aspectRatio: aspectRatio || 16/9 };
+    }
+    const newNode = { id: newId, type, x: cPos.x - 160, y: cPos.y - 100, data };
+    handleUpdateWorkflowFixed(prevNodes => [...prevNodes, newNode], es => es);
+  }, [screenToCanvas, handleUpdateWorkflowFixed]);
+
   const onNodeSelect = useCallback((e, id) => {
       e.stopPropagation();
       if (['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
@@ -2574,9 +2623,10 @@ export default function InfiniteCanvasApp() {
       setCurrentMode: setCurrentMode,
       isModeGenerating: () => modeGenerating,
       getModeSourceNode: () => modeSourceNodeId,
-      getCurrentMode: () => currentMode
+      getCurrentMode: () => currentMode,
+      addNodeFromHistory
     };
-  }, [createStoryboardNodes, createGridNodes, updateStoryboardPrompts, modeGenerating, modeSourceNodeId, currentMode]);
+  }, [createStoryboardNodes, createGridNodes, updateStoryboardPrompts, modeGenerating, modeSourceNodeId, currentMode, addNodeFromHistory]);
 
   useEffect(() => { window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [handleKeyDown]);
 
@@ -2712,7 +2762,7 @@ export default function InfiniteCanvasApp() {
         </div>
       )}
       
-      <div ref={containerRef} className="flex-1 w-full h-full relative bg-black cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} tabIndex={0}>
+      <div ref={containerRef} className="flex-1 w-full h-full relative bg-black cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop} tabIndex={0}>
          <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#27272a 1.5px, transparent 1.5px)', opacity: 1 }} />
          <div className="absolute inset-0 origin-top-left will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
             <svg className="absolute inset-0 overflow-visible pointer-events-none w-full h-full" style={{ zIndex: 0 }}>
