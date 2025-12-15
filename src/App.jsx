@@ -2419,9 +2419,8 @@ export default function InfiniteCanvasApp() {
              return;
           }
 
-          // 获取源节点连接点的位置
-          const sourceNodePos = getHandlePosition(connecting.nodeId, 'source', nodes);
-          setMenu({ x: sourceNodePos.x + 20, y: sourceNodePos.y, sourceId: connecting.nodeId });
+          // 使用当前鼠标位置作为菜单弹出位置
+          setMenu({ x: currentPos.x, y: currentPos.y, sourceId: connecting.nodeId });
           setConnecting(null);
       }
       setDragState(null);

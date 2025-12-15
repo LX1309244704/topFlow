@@ -62,7 +62,10 @@ const apiRequest = async (endpoint, data, method = 'POST', headers = {}) => {
         statusText: response.statusText,
         errorData
       });
-      throw new Error(`API请求失败: ${response.status} - ${errorData.message || '未知错误'}`);
+      const error = new Error(`API请求失败: ${response.status} - ${errorData.message || '未知错误'}`);
+      error.status = response.status;
+      error.errorData = errorData;
+      throw error;
     }
 
     return await response.json();
@@ -118,15 +121,19 @@ const apiRequestWithRetry = async (endpoint, data, method = 'POST', retries = 3,
                             error.message.includes('Failed to fetch') || 
                             error.message.includes('请求超时') ||
                             error.message.includes('NetworkError');
+      
+      const isRetryableStatus = error.status === 429 || error.status === 503 || error.status === 502 || error.status === 504;
+      const isHeavyLoad = error.message.includes('heavy load') || (error.errorData && error.errorData.message && error.errorData.message.includes('heavy load'));
                             
-      if (i < retries - 1 && isNetworkError) {
+      if (i < retries - 1 && (isNetworkError || isRetryableStatus || isHeavyLoad)) {
         // 指数退避策略
         const delay = Math.pow(2, i) * 1000;
+        console.log(`Sora2 API请求失败 (重试 ${i+1}/${retries}):`, error.message);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         // 其他错误直接抛出
         // 如果是最后一次重试且是网络错误，提供额外的诊断信息
-        if (i === retries - 1 && isNetworkError) {
+        if (i === retries - 1 && (isNetworkError || isRetryableStatus || isHeavyLoad)) {
           console.error('🚫 Sora2 API所有重试均失败，可能是网络或服务器问题:', {
             endpoint: `${API_BASE_URL}${endpoint}`,
             originalError: error.originalError || error.message
@@ -173,107 +180,132 @@ export const generateSora2Video = async (prompt, model = 'sora2', images = [], a
   // 添加调试日志，查看传入的参数
   console.log('Sora2视频生成参数:', { prompt, model, images, aspectRatio, duration });
   
-  try {
-    const { orientation, size } = getOrientationAndSize(aspectRatio);
+  const maxGlobalRetries = 3;
+  let globalAttempts = 0;
+
+  while (globalAttempts < maxGlobalRetries) {
+    globalAttempts++;
     
-    // 构建请求参数，按照Sora2 API规范
-    const requestData = {
-      images: images,
-      model: model === 'sora2' ? 'sora-2' : model, // Sora2模型名称为sora-2
-      orientation: orientation,
-      prompt: prompt || '',
-      size: size,
-      duration: duration,
-      watermark: false,
-      private: false
-    };
-    
-    
-    // 创建视频任务（使用重试机制）
-    const response = await apiRequestWithRetry('/v1/video/create', requestData);
-    
-    if (!response.id) {
-      throw new Error('创建Sora2视频任务失败');
-    }
-    
-    // 轮询查询任务状态
-    let attempts = 0;
-    const maxAttempts = 120; // 最多查询60次（5分钟）
-    const pollInterval = 5000; // 每5秒查询一次
-    
-    while (attempts < maxAttempts) {
-      attempts++;
+    try {
+      const { orientation, size } = getOrientationAndSize(aspectRatio);
       
-      // 等待一段时间后查询
-      await new Promise(resolve => setTimeout(resolve, pollInterval));
+      // 构建请求参数，按照Sora2 API规范
+      const requestData = {
+        images: images,
+        model: model === 'sora2' ? 'sora-2' : model, // Sora2模型名称为sora-2
+        orientation: orientation,
+        prompt: prompt || '',
+        size: size,
+        duration: duration,
+        watermark: false,
+        private: false
+      };
       
-      // 查询任务状态 - 使用Sora2 API的查询接口（使用重试机制）
-      const statusResponse = await apiRequestWithRetry(`/v1/video/query?id=${response.id}`, {}, 'GET');
       
-      console.log('Sora2视频任务状态查询:', statusResponse);
+      // 创建视频任务（使用重试机制）
+      const response = await apiRequestWithRetry('/v1/video/create', requestData);
       
-      // 根据Sora2 API返回格式检查状态
-      if (statusResponse.status === 'completed' || statusResponse.status === 'success') {
-        // 如果API返回video_url，直接使用
-        if (statusResponse.video_url) {
-          return statusResponse.video_url;
+      if (!response.id) {
+        throw new Error('创建Sora2视频任务失败');
+      }
+      
+      // 轮询查询任务状态
+      let attempts = 0;
+      const maxAttempts = 120; // 最多查询60次（5分钟）
+      const pollInterval = 5000; // 每5秒查询一次
+      
+      while (attempts < maxAttempts) {
+        attempts++;
+        
+        // 等待一段时间后查询
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        
+        // 查询任务状态 - 使用Sora2 API的查询接口（使用重试机制）
+        const statusResponse = await apiRequestWithRetry(`/v1/video/query?id=${response.id}`, {}, 'GET');
+        
+        console.log('Sora2视频任务状态查询:', statusResponse);
+        
+        // 根据Sora2 API返回格式检查状态
+        if (statusResponse.status === 'completed' || statusResponse.status === 'success') {
+          // 如果API返回video_url，直接使用
+          if (statusResponse.video_url) {
+            return statusResponse.video_url;
+          }
+          // 或者尝试根据id构造视频URL
+          return `${API_BASE_URL}/v1/video/download?id=${response.id}`;
         }
-        // 或者尝试根据id构造视频URL
-        return `${API_BASE_URL}/v1/video/download?id=${response.id}`;
+        
+        if (statusResponse.status === 'failed') {
+          const errorMessage = statusResponse.error?.message || statusResponse.error || '未知错误';
+          
+          // 如果是因为服务器负载过高导致的失败，抛出特殊错误以触发全局重试
+          if (errorMessage.includes('heavy load') || errorMessage.includes('busy')) {
+             throw new Error('HEAVY_LOAD_RETRY');
+          }
+          
+          throw new Error(`Sora2视频生成失败: ${errorMessage}`);
+        }
+        
+        // 任务仍在进行中，继续轮询
+        console.log(`Sora2视频生成中，进度: ${statusResponse.progress || attempts}/${maxAttempts}, 当前状态: ${statusResponse.status}`);
       }
       
-      if (statusResponse.status === 'failed') {
-        const errorMessage = statusResponse.error?.message || statusResponse.error || '未知错误';
-        throw new Error(`Sora2视频生成失败: ${errorMessage}`);
+      const enhancedError = new Error('Sora2视频生成超时（5分钟）');
+      enhancedError.code = 'TIMEOUT_ERROR';
+      enhancedError.solution = '视频生成可能需要更长时间，请稍后重试或尝试简化提示词';
+      enhancedError.details = '视频生成任务在5分钟内未完成，可能是服务器负载较高或生成复杂内容需要更长时间';
+      throw enhancedError;
+    } catch (error) {
+      // 检查是否需要全局重试
+      const isHeavyLoad = error.message === 'HEAVY_LOAD_RETRY' || 
+                          error.message.includes('heavy load') || 
+                          error.message.includes('busy');
+                          
+      if (isHeavyLoad && globalAttempts < maxGlobalRetries) {
+        const retryDelay = 5000 * globalAttempts; // 递增等待时间：5s, 10s
+        console.warn(`Sora2服务器负载过高，正在重新尝试生成 (${globalAttempts}/${maxGlobalRetries})... 等待 ${retryDelay}ms`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        continue;
       }
       
-      // 任务仍在进行中，继续轮询
-      console.log(`Sora2视频生成中，进度: ${statusResponse.progress || attempts}/${maxAttempts}, 当前状态: ${statusResponse.status}`);
+      console.error('Sora2视频生成错误:', error);
+      
+      // 创建友好的错误信息
+      let userFriendlyError = new Error();
+      
+      if (error.code === 'TIMEOUT_ERROR') {
+        userFriendlyError.message = '视频生成超时';
+        userFriendlyError.code = 'TIMEOUT_ERROR';
+        userFriendlyError.solution = error.solution;
+        userFriendlyError.details = error.details;
+      } else if (error.isNetworkError || error.message.includes('Failed to fetch') || error.message.includes('网络连接失败')) {
+        userFriendlyError.message = '网络连接失败';
+        userFriendlyError.code = 'NETWORK_ERROR';
+        userFriendlyError.solution = '请检查网络连接，或稍后重试';
+        userFriendlyError.details = '无法连接到Sora2视频生成服务';
+      } else if (error.message.includes('API Key')) {
+        userFriendlyError.message = 'API Key未配置';
+        userFriendlyError.code = 'API_KEY_ERROR';
+        userFriendlyError.solution = '请点击左下角"API Key"按钮配置有效的API Key';
+        userFriendlyError.details = '需要有效的API Key才能使用Sora2视频生成功能';
+      } else if (error.message.includes('服务器错误') || error.message.includes('500') || error.message.includes('heavy load')) {
+        userFriendlyError.message = '服务器繁忙';
+        userFriendlyError.code = 'SERVER_BUSY';
+        userFriendlyError.solution = '服务器负载过高，已自动重试多次但仍失败，请稍后重试';
+        userFriendlyError.details = 'Sora2视频生成服务暂时不可用';
+      } else {
+        userFriendlyError.message = '视频生成失败';
+        userFriendlyError.code = 'GENERAL_ERROR';
+        userFriendlyError.solution = '请检查提示词内容，或尝试重新生成';
+        userFriendlyError.details = error.message || '未知错误';
+      }
+      
+      // 保留原始错误信息用于调试
+      userFriendlyError.originalError = error;
+      
+      // 抛出友好的错误信息
+      throw userFriendlyError;
     }
-    
-    const enhancedError = new Error('Sora2视频生成超时（5分钟）');
-    enhancedError.code = 'TIMEOUT_ERROR';
-    enhancedError.solution = '视频生成可能需要更长时间，请稍后重试或尝试简化提示词';
-    enhancedError.details = '视频生成任务在5分钟内未完成，可能是服务器负载较高或生成复杂内容需要更长时间';
-    throw enhancedError;
-  } catch (error) {
-    console.error('Sora2视频生成错误:', error);
-    
-    // 创建友好的错误信息
-    let userFriendlyError = new Error();
-    
-    if (error.code === 'TIMEOUT_ERROR') {
-      userFriendlyError.message = '视频生成超时';
-      userFriendlyError.code = 'TIMEOUT_ERROR';
-      userFriendlyError.solution = error.solution;
-      userFriendlyError.details = error.details;
-    } else if (error.isNetworkError || error.message.includes('Failed to fetch') || error.message.includes('网络连接失败')) {
-      userFriendlyError.message = '网络连接失败';
-      userFriendlyError.code = 'NETWORK_ERROR';
-      userFriendlyError.solution = '请检查网络连接，或稍后重试';
-      userFriendlyError.details = '无法连接到Sora2视频生成服务';
-    } else if (error.message.includes('API Key')) {
-      userFriendlyError.message = 'API Key未配置';
-      userFriendlyError.code = 'API_KEY_ERROR';
-      userFriendlyError.solution = '请点击左下角"API Key"按钮配置有效的API Key';
-      userFriendlyError.details = '需要有效的API Key才能使用Sora2视频生成功能';
-    } else if (error.message.includes('服务器错误') || error.message.includes('500')) {
-      userFriendlyError.message = '服务器暂时不可用';
-      userFriendlyError.code = 'SERVER_ERROR';
-      userFriendlyError.solution = '服务器可能正在维护，请稍后重试';
-      userFriendlyError.details = 'Sora2视频生成服务暂时不可用';
-    } else {
-      userFriendlyError.message = '视频生成失败';
-      userFriendlyError.code = 'GENERAL_ERROR';
-      userFriendlyError.solution = '请检查提示词内容，或尝试重新生成';
-      userFriendlyError.details = error.message || '未知错误';
-    }
-    
-    // 保留原始错误信息用于调试
-    userFriendlyError.originalError = error;
-    
-    // 抛出友好的错误信息
-    throw userFriendlyError;
   }
 };
 
