@@ -13,6 +13,8 @@ const NodeCard = React.memo(({
   onConnectStart, 
   onConnectEnd, 
   linkedSources, 
+  imageInputs,
+  videoInputs,
   onSpawnNodes, 
   onDelete, 
   apiFunctions, 
@@ -25,7 +27,8 @@ const NodeCard = React.memo(({
   }, [isSelected]);
 
   const promptInputNode = linkedSources.textInput;
-  const imageInputNodes = linkedSources.imageInputs;
+  const imageInputNodes = imageInputs || linkedSources.imageInputs || [];
+  const videoInputNodes = videoInputs || linkedSources.videoInputs || [];
   const promptFromSource = promptInputNode?.data?.text || node.data.prompt;
   const textInputLabel = useMemo(() => 
     promptInputNode ? `节点 #${promptInputNode.id.toString().slice(-4)}` : null, 
@@ -46,45 +49,32 @@ const NodeCard = React.memo(({
     const prompt = promptFromSource;
     let referenceImage = null; 
     let referenceImages = []; 
-    
     if (node.type === 'image') {
-      if (imageInputNodes.length > 0) referenceImage = imageInputNodes[0].data.generatedImage;
-      else if (node.data.generatedImage) referenceImage = node.data.generatedImage;
+        // 支持多张参考图：使用所有连接的图片节点的图片
+        // 优先使用涂鸦图片(doodleImage)，如果没有则使用生成的基础图片(generatedImage)
+        referenceImages = imageInputNodes.map(n => n.data.doodleImage || n.data.generatedImage).filter(img => img);
+        // 向后兼容：如果只有一张参考图，使用单参考图模式
+        if (referenceImages.length > 0) referenceImage = referenceImages[0];
+        else if (node.data.generatedImage) referenceImage = node.data.doodleImage || node.data.generatedImage;
     } else if (node.type === 'video') {
-      // 优先检查视频节点输入是否有 capturedFrame 或 lastFrame
-      // 如果有视频节点作为输入，且该节点有 capturedFrame 或 lastFrame，则优先使用它作为参考图
-      const videoInputNodes = linkedSources.videoInputs || [];
-      const capturedFrames = videoInputNodes
-        .map(n => n.data.capturedFrame || n.data.lastFrame)
-        .filter(img => img && typeof img === 'string' && img.startsWith('data:'));
-      
-      let allReferences = [];
-      
-      if (capturedFrames.length > 0) {
-        allReferences = [...capturedFrames];
-      } else {
-         // 如果没有截取帧或已保存的最后一帧，尝试使用videoUrl提取最后一帧（异步操作可能不适合这里同步获取，但我们尽力获取已有的数据）
-         // 注意：这里的filter可能会漏掉只有videoUrl但没有lastFrame的情况
-         // 但由于我们不能在渲染阶段异步提取，只能依赖已经提取好的数据
-         // 所以确保NodeContent中正确提取并保存lastFrame至关重要
-      }
-      
-      // 添加普通图片输入
-      const normalImages = imageInputNodes.map(n => n.data.generatedImage).filter(img => img);
-      if (normalImages.length > 0) {
-        allReferences = [...allReferences, ...normalImages];
-      }
-
-      // 根据模型限制参考图数量
-      const currentModel = node.data.model || "sora2";
-      let maxImages = 0;
-      if (currentModel === 'sora2') maxImages = 1;
-      else if (currentModel === 'veo_3_1-fast') maxImages = 2;
-      
-      referenceImages = allReferences.slice(0, maxImages);
+        // 支持图片节点和视频节点作为输入源
+        // 优先使用涂鸦图片(doodleImage)，如果没有则使用生成的基础图片(generatedImage)
+        referenceImages = imageInputNodes.map(n => n.data.doodleImage || n.data.generatedImage).filter(img => img);
+        
+        // 处理视频节点输入：优先使用截取帧，其次使用缓存的尾帧
+        if (videoInputNodes.length > 0) {
+            for (const videoNode of videoInputNodes) {
+                if (videoNode.data.capturedFrame) {
+                    referenceImages.push(videoNode.data.capturedFrame);
+                } else if (videoNode.data.lastFrame) {
+                    referenceImages.push(videoNode.data.lastFrame);
+                }
+            }
+        }
     }
     
     const isRefValid = referenceImage && typeof referenceImage === 'string' && referenceImage.startsWith('data:');
+    const areRefsValid = referenceImages.every(img => img && typeof img === 'string' && img.startsWith('data:'));
 
     if ((node.data.batchSize || 1) > 1) {
       if (onSpawnNodes) onSpawnNodes(node.id, prompt, isRefValid ? referenceImage : null); 
@@ -93,7 +83,7 @@ const NodeCard = React.memo(({
 
     if (node.data.isGenerating) return;
     
-    const hasReference = (node.type === 'image' && referenceImage) || (node.type === 'video' && referenceImages.length > 0);
+    const hasReference = (node.type === 'image' && (referenceImage || referenceImages.length > 0)) || (node.type === 'video' && referenceImages.length > 0);
     updateNode(node.id, { data: { ...node.data, isGenerating: true, usingReference: hasReference } });
 
     try {
@@ -105,7 +95,10 @@ const NodeCard = React.memo(({
         let url = null;
         
         try {
-            if (referenceImage && isRefValid) {
+            // 支持多张参考图：如果有多个参考图，使用第一张（API当前仅支持单图）
+            if (referenceImages.length > 1 && areRefsValid) {
+                url = await apiFunctions.generateImageFromRef(prompt, referenceImages[0], selectedModel, selectedRatio);
+            } else if (referenceImage && isRefValid) {
                 url = await apiFunctions.generateImageFromRef(prompt, referenceImage, selectedModel, selectedRatio);
             } else {
                 url = await apiFunctions.generateImage(prompt, selectedModel, selectedRatio);
@@ -166,17 +159,48 @@ const NodeCard = React.memo(({
             });
         }
       } else if (node.type === 'video') {
-        setTimeout(() => {
+        try {
+          const videoUrl = await apiFunctions.generateVideo(
+            promptFromSource || node.data.prompt,
+            node.data.model || 'sora2',
+            referenceImages,
+            node.data.ratio || '16:9',
+            node.data.duration || 10
+          );
+          
+          indexedDBManager.saveToHistory({
+            type: 'video',
+            url: videoUrl,
+            prompt: promptFromSource || node.data.prompt,
+            model: node.data.model || 'sora2',
+            ratio: node.data.ratio || '16:9',
+            metadata: {
+              nodeId: node.id
+            }
+          }).catch(err => console.error('Failed to save video to history:', err));
+
           updateNode(node.id, { 
             data: { 
               ...node.data, 
               isGenerating: false, 
               generatedVideo: true, 
-              videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4", 
+              videoUrl: videoUrl, 
               prompt: promptFromSource || node.data.prompt 
             } 
           });
-        }, 2000);
+        } catch (videoError) {
+          console.error('视频生成失败:', videoError);
+          updateNode(node.id, { 
+            data: { 
+              ...node.data, 
+              isGenerating: false, 
+              generatedVideo: false, 
+              videoUrl: null,
+              errorMessage: videoError.message || '视频生成失败，请检查提示词是否符合规范',
+              prompt: promptFromSource || node.data.prompt 
+            } 
+          });
+        }
       } else if (node.type === 'audio') {
         let audioUrl = null;
         // 根据音频节点模式选择不同的生成方法
@@ -198,7 +222,7 @@ const NodeCard = React.memo(({
     } catch (err) {
       updateNode(node.id, { data: { ...node.data, isGenerating: false, usingReference: false } });
     }
-  }, [node.id, node.data, updateNode, node.type, onSpawnNodes, promptFromSource, imageInputNodes, apiFunctions]); 
+  }, [node.id, node.data, updateNode, node.type, onSpawnNodes, promptFromSource, imageInputNodes, videoInputNodes, apiFunctions]); 
 
   const toggleExpand = useCallback((e) => { 
     e.stopPropagation(); 
@@ -285,6 +309,8 @@ const NodeCard = React.memo(({
             updateNode={updateNode} 
             generateText={apiFunctions.generateText} 
             generateStreamText={apiFunctions.generateStreamText} 
+            generateTextWithImage={apiFunctions.generateTextWithImage}
+            imageInputs={linkedSources.imageInputs}
             handleAnalyze={(script) => apiFunctions.handleTextNodeAnalysis(script, node.id)} 
             isAnalyzing={node.data.isAnalyzing}
           />
@@ -297,6 +323,9 @@ const NodeCard = React.memo(({
             handleGenerate={handleGenerate} 
             textInputLabel={null} 
             generateText={apiFunctions.generateText}
+            linkedSources={linkedSources}
+            imageInputs={linkedSources.imageInputs}
+            videoInputs={linkedSources.videoInputs}
           />
         )}
         {node.type === 'video' && (
@@ -307,6 +336,7 @@ const NodeCard = React.memo(({
             handleGenerate={handleGenerate} 
             textInputLabel={null} 
             imageInputs={linkedSources.imageInputs} 
+            videoInputs={linkedSources.videoInputs}
             linkedSources={linkedSources}
             generateText={apiFunctions.generateText}
           />

@@ -5,7 +5,8 @@ import {
   RefreshCw, Download, Trash2, BookOpenText, Pencil, Key, Save, Search, TestTube, Users, Clock, Map, Film
 } from 'lucide-react';
 import apiClient from './api/client';
-import { createBatchNodes } from './utils/workflow';
+import { createBatchNodes, performAutoLayout } from './utils/workflow';
+import { LAYOUT_CONSTANTS } from './constants.js';
 import { AudioContent, TextContent, ImageContent, VideoContent } from './components/NodeContent.jsx';
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 import { AssetModal, SaveProjectModal, ProjectMenu, HistoryModal } from './components/Modals.jsx';
@@ -14,6 +15,7 @@ import { CreationMenu, TemplateListModal } from './components/TemplateComponents
 import SplashScreen from './components/SplashScreen.jsx';
 import { indexedDBManager } from './utils/indexedDB';
 import { NotificationContainer, useNotification } from './components/Notification.jsx';
+import { Button, NodeSelect, HandlePoint, BezierCurve } from './components/UI.jsx';
 
 // 提取视频最后一帧的函数
 const extractLastFrameFromVideo = async (videoUrl) => {
@@ -133,67 +135,7 @@ const downloadFile = (url, filename) => {
   document.body.removeChild(link);
 };
 
-// --- UI Components ---
-
-const Button = React.memo(({ children, className, variant = 'primary', onClick, icon: Icon, disabled, title }) => {
-  const variants = {
-    primary: "bg-zinc-100 text-zinc-900 hover:bg-white disabled:bg-zinc-800 shadow-md",
-    secondary: "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:bg-zinc-800",
-    ghost: "bg-transparent text-zinc-400 hover:bg-zinc-800",
-    icon: "p-2 hover:bg-zinc-800 rounded-md text-zinc-400",
-  };
-  return (
-    <button onClick={onClick} onMouseDown={e => e.stopPropagation()} disabled={disabled} className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm active:scale-95 select-none ${variants[variant]} ${className}`} title={title}>
-      {Icon && <Icon size={16} />}
-      {children}
-    </button>
-  );
-});
-
-const NodeSelect = ({ value, options, onChange, icon: Icon, className }) => (
-  <div className={`relative group flex-shrink-0 ${className}`} onMouseDown={e => e.stopPropagation()}>
-    {Icon && <div className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none"><Icon size={10} /></div>}
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={`appearance-none bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-[10px] font-medium text-zinc-300 py-1.5 ${Icon ? 'pl-6' : 'pl-2'} pr-5 rounded-md focus:outline-none focus:ring-1 focus:ring-zinc-700 cursor-pointer w-full transition-colors`}>
-      {options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-    </select>
-    <div className="absolute right-1 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500"><ChevronDown size={10} /></div>
-  </div>
-);
-
-const HandlePoint = React.memo(({ type, top, onMouseDown, onMouseUp }) => (
-  <div 
-    className={`absolute w-6 h-6 flex items-center justify-center cursor-crosshair z-[60] hover:scale-110 transition-transform ${type === 'source' ? '-right-5' : '-left-5'}`}
-    style={{ top: top, marginTop: -12 }}
-    onMouseDown={onMouseDown}
-    onMouseUp={onMouseUp}
-  >
-    <div className={`w-3.5 h-3.5 rounded-full border-2 border-zinc-900 shadow-md transition-colors duration-200 ${type === 'source' ? 'bg-zinc-100' : 'bg-zinc-500 hover:bg-zinc-400'}`} />
-  </div>
-));
-
-const BezierCurve = React.memo(({ start, end, stroke = "#52525b", strokeWidth = 3, strokeDasharray, isSelected, onDoubleClick }) => {
-  const dist = Math.abs(end.x - start.x);
-  const controlOffset = Math.max(dist * 0.5, 50);
-  const path = `M ${start.x} ${start.y} C ${start.x + controlOffset} ${start.y}, ${end.x - controlOffset} ${end.y}, ${end.x} ${end.y}`;
-  return (
-    <g onDoubleClick={onDoubleClick} className="group pointer-events-auto cursor-pointer">
-      <path d={path} stroke="transparent" strokeWidth="20" fill="none" />
-      <path d={path} stroke={isSelected ? "#f4f4f5" : stroke} strokeWidth={strokeWidth} fill="none" strokeDasharray={strokeDasharray} className="transition-colors duration-200 group-hover:stroke-zinc-400" />
-      <circle cx={start.x} cy={start.y} r="3" fill={isSelected ? "#f4f4f5" : stroke} />
-      <circle cx={end.x} cy={end.y} r="3" fill={isSelected ? "#f4f4f5" : stroke} />
-    </g>
-  );
-});
-
-const InputBadge = ({ text, type }) => {
-  const display = (typeof text === 'string' || typeof text === 'number') ? text : JSON.stringify(text || '');
-  return (
-    <div className="flex items-center gap-1.5 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[10px] text-zinc-400 mb-2 animate-in fade-in">
-      <LinkIcon size={10} />
-      <span className="font-medium truncate max-w-[200px]">引用: {display} ({type === 'text' ? '文本' : '图片'})</span>
-    </div>
-  );
-};
+// --- UI Components (refactored to components/UI.jsx) ---
 
 // --- Node Content Components (Defined before NodeCard) ---
 // 使用 src/components/NodeContent.jsx 中的组件定义
@@ -1885,6 +1827,13 @@ export default function InfiniteCanvasApp() {
   const deleteNode = useCallback((id) => { handleUpdateWorkflowFixed(ns => ns.filter(n => n.id !== id), es => es.filter(e => e.source !== id && e.target !== id)); setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; }); }, [handleUpdateWorkflowFixed]);
   const handleAddEpisode = useCallback(() => { const id = Date.now(); setProject(p => ({ ...p, episodes: [...p.episodes, { id, name: `新剧集 ${p.episodes.length + 1}` }], workflows: { ...p.workflows, [id]: { nodes: [], edges: [] } } })); }, []);
   const handleDeleteEpisode = useCallback((id) => { setProject(p => { const w = { ...p.workflows }; delete w[id]; const eps = p.episodes.filter(e => e.id !== id); return { ...p, episodes: eps, workflows: w, currentEpisodeId: p.currentEpisodeId === id ? (eps[0]?.id || null) : p.currentEpisodeId }; }); setSelectedIds(new Set()); }, []);
+
+  const autoLayoutAllNodes = useCallback(() => {
+    handleUpdateWorkflowFixed(
+      prevNodes => performAutoLayout(prevNodes, edges),
+      es => es
+    );
+  }, [edges, handleUpdateWorkflowFixed]);
   const handleUpdateEpisodeName = useCallback((id, name) => setProject(p => ({ ...p, episodes: p.episodes.map(e => e.id === id ? { ...e, name } : e) })), []);
   const handleSwitchEpisode = useCallback((id) => { if (id !== currentEpisodeId) { setProject(p => ({ ...p, currentEpisodeId: id })); setSelectedIds(new Set()); setMenu(null); } }, [currentEpisodeId]);
   
@@ -2594,6 +2543,38 @@ export default function InfiniteCanvasApp() {
       return;
     }
     
+    // Ctrl+C 复制选中节点并在旁边创建副本
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+      if (selectedIds.size > 0) {
+        e.preventDefault();
+        const idsToCopy = Array.from(selectedIds);
+        const gap = (LAYOUT_CONSTANTS?.MAGNETIC_GAP ?? 0);
+        const newNodesToAdd = [];
+        idsToCopy.forEach(id => {
+          const src = (nodes || []).find(n => n.id === id);
+          if (!src) return;
+          const width = NODE_WIDTHS[src.type] || 320;
+          const newId = Date.now() + Math.floor(Math.random() * 1000);
+          const cloneData = JSON.parse(JSON.stringify(src.data));
+          const newNode = { 
+            id: newId, 
+            type: src.type, 
+            x: src.x + width + gap, 
+            y: src.y, 
+            data: cloneData 
+          };
+          newNodesToAdd.push(newNode);
+        });
+        if (newNodesToAdd.length > 0) {
+          handleUpdateWorkflowFixed(
+            prevNodes => [...prevNodes, ...newNodesToAdd],
+            es => es
+          );
+        }
+      }
+      return;
+    }
+    
     if (e.key === 'Delete' || e.key === 'Backspace') {
       if (selectedIds.size > 0) {
         e.preventDefault(); 
@@ -2605,7 +2586,7 @@ export default function InfiniteCanvasApp() {
         setSelectedIds(new Set()); 
       }
     }
-  }, [selectedIds, handleUpdateWorkflowFixed, setShowSaveProjectModal]);
+  }, [selectedIds, handleUpdateWorkflowFixed, setShowSaveProjectModal, nodes]);
 
   // 模式生成状态管理
   const [modeGenerating, setModeGeneratingState] = useState(false);
@@ -2624,9 +2605,10 @@ export default function InfiniteCanvasApp() {
       isModeGenerating: () => modeGenerating,
       getModeSourceNode: () => modeSourceNodeId,
       getCurrentMode: () => currentMode,
-      addNodeFromHistory
+      addNodeFromHistory,
+      autoLayoutAllNodes
     };
-  }, [createStoryboardNodes, createGridNodes, updateStoryboardPrompts, modeGenerating, modeSourceNodeId, currentMode, addNodeFromHistory]);
+  }, [createStoryboardNodes, createGridNodes, updateStoryboardPrompts, modeGenerating, modeSourceNodeId, currentMode, addNodeFromHistory, autoLayoutAllNodes]);
 
   useEffect(() => { window.addEventListener('keydown', handleKeyDown); return () => window.removeEventListener('keydown', handleKeyDown); }, [handleKeyDown]);
 
@@ -2691,8 +2673,9 @@ export default function InfiniteCanvasApp() {
             setHistoryModalPos(null);
           }
           setShowHistoryModal(true);
-        }} 
-      />
+        }}
+        onAutoLayout={autoLayoutAllNodes}
+      /> 
       {showProjectMenu && <ProjectMenu onClose={() => setShowProjectMenu(false)} episodes={project.episodes} currentEpisodeId={currentEpisodeId} onUpdateName={handleUpdateEpisodeName} onAddEpisode={handleAddEpisode} onDeleteEpisode={handleDeleteEpisode} onSelectEpisode={handleSwitchEpisode} position={projectMenuPos} />}
       {showApiKeyModal && <ApiKeyConfigModal onClose={() => setShowApiKeyModal(false)} currentKey={userApiKey} onSave={setUserApiKey} onClear={() => setUserApiKey("")} />}
       {showHistoryModal && <HistoryModal onClose={() => setShowHistoryModal(false)} position={historyModalPos} />}

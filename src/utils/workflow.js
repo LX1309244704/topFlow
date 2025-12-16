@@ -4,87 +4,52 @@ import { getNodeHeight } from '../constants.js';
 // 自动布局算法
 export const performAutoLayout = (nodes, edges) => {
   if (!nodes.length) return nodes;
-  
-  const adjacency = {};
-  const inDegree = {};
-  
-  // 构建邻接表和入度表
-  nodes.forEach(n => { 
-    adjacency[n.id] = []; 
-    inDegree[n.id] = 0; 
-  });
-  
-  edges.forEach(e => {
-    if (adjacency[e.source]) adjacency[e.source].push(e.target);
-    if (inDegree[e.target] !== undefined) inDegree[e.target]++;
-  });
-
-  // 拓扑排序分层
-  const levels = [];
-  const queue = nodes.filter(n => inDegree[n.id] === 0).map(n => ({ id: n.id, level: 0 }));
-  
-  if (queue.length === 0 && nodes.length > 0) {
-    queue.push({ id: nodes[0].id, level: 0 });
-  }
-  
-  const visited = new Set();
-  
-  while (queue.length > 0) {
-    const { id, level } = queue.shift();
-    if (visited.has(id)) continue;
-    visited.add(id);
-    
-    if (!levels[level]) levels[level] = [];
-    levels[level].push(id);
-    
-    if (adjacency[id]) {
-      adjacency[id].forEach(targetId => { 
-        if (!visited.has(targetId)) {
-          queue.push({ id: targetId, level: level + 1 }); 
-        }
-      });
-    }
-  }
-  
-  // 处理未访问的节点
-  nodes.forEach(n => { 
-    if (!visited.has(n.id)) { 
-      if (!levels[0]) levels[0] = []; 
-      levels[0].push(n.id); 
-      visited.add(n.id); 
-    } 
-  });
-
-  // 布局计算
   const newNodes = [...nodes];
-  const { GRID_W, START_X, START_Y, MAX_PER_ROW, LEVEL_MARGIN, VERTICAL_SPACING } = LAYOUT_CONSTANTS;
-  
-  let currentLevelX = START_X;
-  
-  levels.forEach((levelNodes) => {
-    if (!levelNodes || !levelNodes.length) return;
-    
-    const columnYPositions = {}; 
-    let maxCols = 0;
-    
-    levelNodes.forEach((nodeId, index) => {
-      const nodeIndex = newNodes.findIndex(n => n.id === nodeId);
-      if (nodeIndex === -1) return;
-      
-      const node = newNodes[nodeIndex];
-      const nodeHeight = getNodeHeight(node); 
-      const col = index % MAX_PER_ROW;
-      maxCols = Math.max(maxCols, col + 1);
-      const currentY = columnYPositions[col] || START_Y;
-      
-      node.x = currentLevelX + col * GRID_W;
-      node.y = currentY;
-      columnYPositions[col] = currentY + nodeHeight + VERTICAL_SPACING;
-    });
-    
-    currentLevelX = currentLevelX + (maxCols * GRID_W) + LEVEL_MARGIN; 
+  const { START_X, START_Y, MAGNETIC_GAP } = LAYOUT_CONSTANTS;
+  const idIndex = new Map();
+  newNodes.forEach((n, i) => idIndex.set(n.id, i));
+  const childrenMap = {};
+  const inDegree = {};
+  newNodes.forEach(n => { childrenMap[n.id] = []; inDegree[n.id] = 0; });
+  edges.forEach(e => { if (childrenMap[e.source]) childrenMap[e.source].push(e.target); if (inDegree[e.target] !== undefined) inDegree[e.target]++; });
+  const roots = newNodes.filter(n => inDegree[n.id] === 0);
+  let xCursor = START_X;
+  const yBase = START_Y;
+  const placed = new Set();
+  roots.forEach(root => {
+    const ri = idIndex.get(root.id);
+    const rw = NODE_WIDTHS[newNodes[ri].type] || 320;
+    newNodes[ri].x = xCursor;
+    newNodes[ri].y = yBase;
+    xCursor += rw + MAGNETIC_GAP;
+    placed.add(root.id);
   });
-  
+  const queue = [...roots.map(r => r.id)];
+  const placeChain = (pid) => {
+    const pi = idIndex.get(pid);
+    if (pi === undefined) return;
+    const parent = newNodes[pi];
+    const ph = getNodeHeight(parent);
+    let yNext = parent.y + ph;
+    const kids = childrenMap[pid] || [];
+    kids.forEach(cid => {
+      const ci = idIndex.get(cid);
+      if (ci === undefined) return;
+      const child = newNodes[ci];
+      const ch = getNodeHeight(child);
+      child.x = parent.x;
+      child.y = yNext;
+      yNext += ch; // VERTICAL_SPACING 为 0，实现贴合
+      if (!placed.has(cid)) {
+        placed.add(cid);
+        placeChain(cid);
+      }
+    });
+  };
+  while (queue.length > 0) {
+    const pid = queue.shift();
+    placeChain(pid);
+  }
   return newNodes;
 };
 
