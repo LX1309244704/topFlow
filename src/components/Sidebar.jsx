@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Type, ImageIcon, Video, Music, FolderKanban, Plus, Zap, History
+  Type, ImageIcon, Video, Music, FolderKanban, Plus, Zap, History, ArrowLeftRight
 } from 'lucide-react';
 
 export const Sidebar = React.memo(({ 
@@ -8,23 +8,25 @@ export const Sidebar = React.memo(({
   onShowProjectMenu, 
   onShowTemplateList, 
   onShowAssetModal,
-  onShowHistory
+  onShowHistory,
+  viewMode = 'development',
+  onToggleMode
 }) => (
   <div className="fixed left-6 top-1/2 -translate-y-1/2 z-[100]" onMouseDown={e => e.stopPropagation()}>
     <div className="relative bg-zinc-900/95 backdrop-blur-xl rounded-xl shadow-lg border border-zinc-800 flex flex-col py-2 px-2 gap-1">
       
-      {/* 快速添加按钮 -> 改为项目管理 */}
-      <div className="relative flex justify-center mb-2 pb-2 border-b border-zinc-800">
+      {/* 模式切换按钮 */}
+      <div className={`relative flex justify-center ${viewMode === 'development' ? 'mb-2 pb-2 border-b border-zinc-800' : ''}`}>
         <button 
-          onClick={(e) => onShowProjectMenu(e)}
+          onClick={onToggleMode}
           className="relative w-10 h-10 rounded-lg bg-zinc-100 text-zinc-900 flex items-center justify-center shadow-sm transition-all duration-200 hover:bg-white hover:scale-105"
-          title="项目管理"
+          title={viewMode === 'production' ? "切换到开发模式" : "切换到生产模式"}
         >
-          <FolderKanban size={18} />
+          <ArrowLeftRight size={18} />
         </button>
       </div>
 
-      {[
+      {viewMode === 'development' && [
         { id: 'text', icon: Type, label: '文本', action: () => onAdd('text') }, 
         { id: 'image', icon: ImageIcon, label: '图片', action: () => onAdd('image') }, 
         { id: 'video', icon: Video, label: '视频', action: () => onAdd('video') }, 
@@ -40,7 +42,6 @@ export const Sidebar = React.memo(({
             <item.icon size={18} strokeWidth={2} />
           </button>
           
-          {/* 悬浮提示 */}
           <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 px-2 py-1 bg-zinc-800 text-zinc-100 border border-zinc-700 text-[10px] font-medium rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
             {item.label}
           </div>

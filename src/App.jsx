@@ -11,6 +11,7 @@ import { AudioContent, TextContent, ImageContent, VideoContent } from './compone
 import { textRoleOptions, rolePrompts, getRolePrompt } from './utils/roles';
 import { AssetModal, SaveProjectModal, ProjectMenu, HistoryModal } from './components/Modals.jsx';
 import { Sidebar } from './components/Sidebar.jsx';
+import { ProductionMode } from './components/ProductionMode.jsx';
 import { CreationMenu, TemplateListModal } from './components/TemplateComponents.jsx';
 import SplashScreen from './components/SplashScreen.jsx';
 import { indexedDBManager } from './utils/indexedDB';
@@ -102,7 +103,7 @@ const getNodeWidth = (node) => {
 };
 
 const getNodeHeight = (node) => {
-  if (node.type === 'text') return node.data.height || 200; 
+  if (node.type === 'text') return node.data.height || 350; 
   if (node.type === 'audio') return 140; 
   const width = getNodeWidth(node);
   const ratio = node.data.aspectRatio || (node.type === 'video' ? 16/9 : 4/3); 
@@ -120,7 +121,7 @@ const getHandlePosition = (nodeId, handleType, nodes) => {
   } else if (node.type === 'audio') {
       handleY = 48; 
   } else if (node.type === 'text') {
-      handleY = (node.data.height || 200) / 2; 
+      handleY = (node.data.height || 350) / 2; 
   }
   return { x: handleType === 'source' ? node.x + width + 12 : node.x - 12, y: node.y + handleY };
 };
@@ -371,7 +372,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
       const previewHeight = width / ratio; 
       handleY = previewHeight / 2;
   } else if (node.type === 'audio') handleY = 48;
-  else if (node.type === 'text') handleY = (node.data.height || 200) / 2; 
+  else if (node.type === 'text') handleY = (node.data.height || 350) / 2; 
 
   const headerIcon = { image: ImageIcon, video: Video, audio: Music, text: FileText }[node.type];
   const headerLabel = { image: "Image", video: "Video", audio: "Audio", text: "Text" }[node.type];
@@ -820,6 +821,7 @@ const ApiTest = React.lazy(() => import('./components/ApiTest'));
 
 export default function InfiniteCanvasApp() {
   const [showSplash, setShowSplash] = useState(true);
+  const [viewMode, setViewMode] = useState('development'); // 'development' | 'production'
   // 通知系统
   const { notifications, removeNotification, success, error, info } = useNotification();
   
@@ -841,7 +843,7 @@ export default function InfiniteCanvasApp() {
   const DB_NAME = 'TapNowCloneDB';
   const STORE_NAME = 'projects';
   const PROJECT_KEY = 'currentProject';
-  const initialProjectState = useMemo(() => ({ episodes: [{ id: 1, name: "第一集：雨夜追逐" }, { id: 2, name: "第二集：失落的线索" }], currentEpisodeId: 1, workflows: { 1: { nodes: [{ id: 1, type: 'image', x: 400, y: 150, data: { prompt: "赛博朋克风格的街道...", model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 } }, { id: 2, type: 'text', x: 800, y: 150, data: { text: "场景 1: 雨夜\n\n一辆黑色的车飞驰而过...", isWriting: false, isAnalyzing: false, height: 200 } }], edges: [] }, 2: { nodes: [], edges: [] } } }), []);
+  const initialProjectState = useMemo(() => ({ episodes: [{ id: 1, name: "第一集：雨夜追逐" }, { id: 2, name: "第二集：失落的线索" }], currentEpisodeId: 1, workflows: { 1: { nodes: [{ id: 1, type: 'image', x: 400, y: 150, data: { prompt: "赛博朋克风格的街道...", model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 } }, { id: 2, type: 'text', x: 800, y: 150, data: { text: "场景 1: 雨夜\n\n一辆黑色的车飞驰而过...", isWriting: false, isAnalyzing: false, height: 350 } }], edges: [] }, 2: { nodes: [], edges: [] } } }), []);
 
   const [project, setProject] = useState(initialProjectState);
   const [isLoading, setIsLoading] = useState(true);
@@ -1844,7 +1846,7 @@ export default function InfiniteCanvasApp() {
     let initialData = { prompt: "", isGenerating: false };
     if (type === 'image') initialData = { ...initialData, model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 };
     else if (type === 'video') initialData = { ...initialData, model: "sora2", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
-    else if (type === 'text') initialData = { text: "", isAnalyzing: false, isWriting: false, height: 200 }; 
+    else if (type === 'text') initialData = { text: "", isAnalyzing: false, isWriting: false, height: 350 }; 
     
     const newNode = { id: Date.now(), type, x: pos.x, y: pos.y, data: initialData };
     
@@ -1870,8 +1872,8 @@ export default function InfiniteCanvasApp() {
       case 'script':
         // 剧本模板：多个文本节点
         addNode('text', 400, 200);
-        addNode('text', 400, 450);
-        addNode('text', 400, 700);
+        addNode('text', 400, 600);
+        addNode('text', 400, 1000);
         break;
       case 'adventure':
         // 冒险故事模板：文本 + 图片 + 音频
@@ -2644,11 +2646,8 @@ export default function InfiniteCanvasApp() {
         onShowProjectMenu={(e) => {
           if (e && e.currentTarget) {
             const rect = e.currentTarget.getBoundingClientRect();
-            // Position to the right of the button (rect.right + margin)
-            // Align with top of the button (rect.top)
             setProjectMenuPos({ x: rect.right + 12, y: rect.top });
           } else {
-            // Fallback
             setProjectMenuPos(null);
           }
           setShowProjectMenu(true);
@@ -2657,7 +2656,6 @@ export default function InfiniteCanvasApp() {
         onShowAssetModal={(e) => {
           if (e && e.currentTarget) {
             const rect = e.currentTarget.getBoundingClientRect();
-            // Align with button top, position to the right
             setAssetModalPos({ x: rect.right + 12, y: rect.top });
           } else {
             setAssetModalPos(null);
@@ -2667,13 +2665,14 @@ export default function InfiniteCanvasApp() {
         onShowHistory={(e) => {
           if (e && e.currentTarget) {
             const rect = e.currentTarget.getBoundingClientRect();
-            // Align with button top, position to the right
             setHistoryModalPos({ x: rect.right + 12, y: rect.top });
           } else {
             setHistoryModalPos(null);
           }
           setShowHistoryModal(true);
         }}
+        viewMode={viewMode}
+        onToggleMode={() => setViewMode(v => v === 'development' ? 'production' : 'development')}
       /> 
       {showProjectMenu && <ProjectMenu onClose={() => setShowProjectMenu(false)} episodes={project.episodes} currentEpisodeId={currentEpisodeId} onUpdateName={handleUpdateEpisodeName} onAddEpisode={handleAddEpisode} onDeleteEpisode={handleDeleteEpisode} onSelectEpisode={handleSwitchEpisode} position={projectMenuPos} />}
       {showApiKeyModal && <ApiKeyConfigModal onClose={() => setShowApiKeyModal(false)} currentKey={userApiKey} onSave={setUserApiKey} onClear={() => setUserApiKey("")} />}
@@ -2744,6 +2743,7 @@ export default function InfiniteCanvasApp() {
         </div>
       )}
       
+      {viewMode === 'development' ? (
       <div ref={containerRef} className="flex-1 w-full h-full relative bg-black cursor-default overflow-hidden" onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onWheel={handleWheel} onDragOver={handleCanvasDragOver} onDrop={handleCanvasDrop} tabIndex={0}>
          <div className="absolute inset-0 pointer-events-none w-full h-full" style={{ backgroundPosition: `${offset.x}px ${offset.y}px`, backgroundSize: `${20 * scale}px ${20 * scale}px`, backgroundImage: 'radial-gradient(#27272a 1.5px, transparent 1.5px)', opacity: 1 }} />
          <div className="absolute inset-0 origin-top-left will-change-transform" style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}>
@@ -2841,6 +2841,15 @@ export default function InfiniteCanvasApp() {
            visible={showMiniMap}
          />
       </div>
+      ) : (
+        <ProductionMode 
+           projects={savedProjects} 
+           onRunProject={(p) => {
+              success(`开始生产项目: ${p.title}`);
+           }}
+           apiFunctions={apiFunctions}
+         />
+      )}
     </div>
   );
 }
