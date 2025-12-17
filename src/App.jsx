@@ -2674,7 +2674,6 @@ export default function InfiniteCanvasApp() {
           }
           setShowHistoryModal(true);
         }}
-        onAutoLayout={autoLayoutAllNodes}
       /> 
       {showProjectMenu && <ProjectMenu onClose={() => setShowProjectMenu(false)} episodes={project.episodes} currentEpisodeId={currentEpisodeId} onUpdateName={handleUpdateEpisodeName} onAddEpisode={handleAddEpisode} onDeleteEpisode={handleDeleteEpisode} onSelectEpisode={handleSwitchEpisode} position={projectMenuPos} />}
       {showApiKeyModal && <ApiKeyConfigModal onClose={() => setShowApiKeyModal(false)} currentKey={userApiKey} onSave={setUserApiKey} onClear={() => setUserApiKey("")} />}

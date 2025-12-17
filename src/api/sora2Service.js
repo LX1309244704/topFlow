@@ -211,7 +211,7 @@ export const generateSora2Video = async (prompt, model = 'sora2', images = [], a
       
       // 轮询查询任务状态
       let attempts = 0;
-      const maxAttempts = 120; // 最多查询60次（5分钟）
+      const maxAttempts = 100; // 最多查询60次（5分钟）
       const pollInterval = 5000; // 每5秒查询一次
       
       while (attempts < maxAttempts) {

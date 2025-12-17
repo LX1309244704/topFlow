@@ -160,8 +160,63 @@ const NodeCard = React.memo(({
         }
       } else if (node.type === 'video') {
         try {
+          // 构建最终提示词，包含专业模式的设置
+          let finalPrompt = promptFromSource || node.data.prompt;
+          
+          // 无论是否显示专业模式面板，只要有设置参数就追加
+          const extraTags = [];
+          
+          // 专业模式参数映射到英文提示词
+          const proModePrompts = {
+            // 机位 (Camera Angles)
+            "水平": "eye level shot",
+            "俯视": "high angle shot, overhead view",
+            "仰视": "low angle shot, looking up",
+            "航拍": "aerial view, drone shot",
+            "侧视": "side view, profile shot",
+            
+            // 景别 (Shot Sizes)
+            "大远景": "extreme long shot, vast scene",
+            "远景": "long shot, wide view",
+            "全景": "full shot, wide angle",
+            "中景": "medium shot, waist up",
+            "特写": "close-up shot, detailed",
+            "大特写": "extreme close-up, macro details",
+            
+            // 分镜/运镜 (Camera Movements)
+            "固定": "static camera, tripod shot",
+            "推镜头": "camera zooming in, dolly in",
+            "拉镜头": "camera zooming out, dolly out",
+            "摇镜头": "camera panning, sweeping shot",
+            "跟随": "tracking shot, following subject",
+            "环绕": "orbit shot, camera circling"
+          };
+
+          if (node.data.camera_pos && proModePrompts[node.data.camera_pos]) {
+            const tag = proModePrompts[node.data.camera_pos];
+            if (!finalPrompt.includes(tag)) {
+              extraTags.push(tag);
+            }
+          }
+          if (node.data.shot_size && proModePrompts[node.data.shot_size]) {
+            const tag = proModePrompts[node.data.shot_size];
+            if (!finalPrompt.includes(tag)) {
+              extraTags.push(tag);
+            }
+          }
+          if (node.data.camera_move && proModePrompts[node.data.camera_move]) {
+            const tag = proModePrompts[node.data.camera_move];
+            if (!finalPrompt.includes(tag)) {
+              extraTags.push(tag);
+            }
+          }
+          
+          if (extraTags.length > 0) {
+            finalPrompt = finalPrompt ? `${finalPrompt}, ${extraTags.join(', ')}` : extraTags.join(', ');
+          }
+
           const videoUrl = await apiFunctions.generateVideo(
-            promptFromSource || node.data.prompt,
+            finalPrompt,
             node.data.model || 'sora2',
             referenceImages,
             node.data.ratio || '16:9',
@@ -171,11 +226,15 @@ const NodeCard = React.memo(({
           indexedDBManager.saveToHistory({
             type: 'video',
             url: videoUrl,
-            prompt: promptFromSource || node.data.prompt,
+            prompt: finalPrompt,
             model: node.data.model || 'sora2',
             ratio: node.data.ratio || '16:9',
             metadata: {
-              nodeId: node.id
+              nodeId: node.id,
+              proMode: node.data.showProMode,
+              camera: node.data.camera_pos,
+              shot: node.data.shot_size,
+              movement: node.data.camera_move
             }
           }).catch(err => console.error('Failed to save video to history:', err));
 
@@ -185,7 +244,7 @@ const NodeCard = React.memo(({
               isGenerating: false, 
               generatedVideo: true, 
               videoUrl: videoUrl, 
-              prompt: promptFromSource || node.data.prompt 
+              prompt: node.data.prompt // 保持原始提示词不变，不显示追加的参数
             } 
           });
         } catch (videoError) {

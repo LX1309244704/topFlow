@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  Type, ImageIcon, Video, Music, FolderKanban, LayoutTemplate, Plus, Zap, History
+  Type, ImageIcon, Video, Music, FolderKanban, Plus, Zap, History
 } from 'lucide-react';
 
 export const Sidebar = React.memo(({ 
@@ -8,8 +8,7 @@ export const Sidebar = React.memo(({
   onShowProjectMenu, 
   onShowTemplateList, 
   onShowAssetModal,
-  onShowHistory,
-  onAutoLayout
+  onShowHistory
 }) => (
   <div className="fixed left-6 top-1/2 -translate-y-1/2 z-[100]" onMouseDown={e => e.stopPropagation()}>
     <div className="relative bg-zinc-900/95 backdrop-blur-xl rounded-xl shadow-lg border border-zinc-800 flex flex-col py-2 px-2 gap-1">
@@ -30,7 +29,6 @@ export const Sidebar = React.memo(({
         { id: 'image', icon: ImageIcon, label: '图片', action: () => onAdd('image') }, 
         { id: 'video', icon: Video, label: '视频', action: () => onAdd('video') }, 
         { id: 'audio', icon: Music, label: '音频', action: () => onAdd('audio') },
-        { id: 'autolayout', icon: LayoutTemplate, label: '自动整理', action: () => onAutoLayout && onAutoLayout() },
         { id: 'history', icon: History, label: '生成历史', action: (e) => onShowHistory(e) },
         { id: 'assets', icon: FolderKanban, label: '资产', action: (e) => onShowAssetModal(e) }
       ].map((item) => (

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop, Clock } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop, Clock, Sliders } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { DrawingCanvas } from './DrawingCanvas.jsx';
 import { FrameCropper } from './FrameCropper.jsx';
@@ -1756,6 +1756,80 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   const [showPreview, setShowPreview] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
 
+  // 专业模式选项
+  const cameraOptions = ["水平", "俯视", "仰视", "航拍", "侧视"];
+  const shotOptions = ["大远景", "远景", "全景", "中景", "特写", "大特写"];
+  const movementOptions = ["固定", "推镜头", "拉镜头", "摇镜头", "跟随", "环绕"];
+
+  // 专业模式参数映射到英文提示词
+  const proModePrompts = {
+    // 机位 (Camera Angles)
+    "水平": "eye level shot",
+    "俯视": "high angle shot, overhead view",
+    "仰视": "low angle shot, looking up",
+    "航拍": "aerial view, drone shot",
+    "侧视": "side view, profile shot",
+    
+    // 景别 (Shot Sizes)
+    "大远景": "extreme long shot, vast scene",
+    "远景": "long shot, wide view",
+    "全景": "full shot, wide angle",
+    "中景": "medium shot, waist up",
+    "特写": "close-up shot, detailed",
+    "大特写": "extreme close-up, macro details",
+    
+    // 分镜/运镜 (Camera Movements)
+    "固定": "static camera, tripod shot",
+    "推镜头": "camera zooming in, dolly in",
+    "拉镜头": "camera zooming out, dolly out",
+    "摇镜头": "camera panning, sweeping shot",
+    "跟随": "tracking shot, following subject",
+    "环绕": "orbit shot, camera circling"
+  };
+
+  // 处理专业模式选择并同步更新提示词
+  const handleProModeSelection = (category, newValue) => {
+    console.log('handleProModeSelection', category, newValue);
+    const currentData = node.data;
+    const oldValue = currentData[category];
+    const isDeselecting = oldValue === newValue;
+    const finalValue = isDeselecting ? null : newValue;
+    
+    // Calculate new prompt
+    let prompt = currentData.prompt || '';
+    
+    // Remove old prompt text if it exists
+    if (oldValue && proModePrompts[oldValue]) {
+      const textToRemove = proModePrompts[oldValue];
+      // Use replace with string to remove first occurrence
+      if (prompt.includes(textToRemove)) {
+        prompt = prompt.replace(textToRemove, '');
+      }
+    }
+    
+    // Add new prompt text
+    if (finalValue && proModePrompts[finalValue]) {
+      const textToAdd = proModePrompts[finalValue];
+      if (!prompt.includes(textToAdd)) {
+        prompt = prompt ? `${prompt}, ${textToAdd}` : textToAdd;
+      }
+    }
+    
+    // Clean up commas and spaces
+    prompt = prompt.replace(/,\s*,/g, ',') // Replace double commas
+                   .replace(/^,\s*/, '')   // Remove leading comma
+                   .replace(/,\s*$/, '')   // Remove trailing comma
+                   .trim();
+    
+    updateNode(node.id, {
+      data: {
+        ...currentData,
+        [category]: finalValue,
+        prompt: prompt
+      }
+    });
+  };
+
   // 获取所有参考图片
   const referenceImages = React.useMemo(() => {
     const images = [];
@@ -2224,7 +2298,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       )}
 
       {/* 底部控制区域 */}
-      <div className={`bg-zinc-950 shadow-md border-x border-b border-zinc-800 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? 'rounded-b-lg opacity-100 max-h-[350px] py-3' : 'opacity-0 max-h-0 py-0 border-none rounded-b-lg'}`} style={{ overflow: 'hidden' }}>
+      <div className={`bg-zinc-950 shadow-md border-x border-b border-zinc-800 p-3 flex flex-col gap-3 relative z-10 ${isExpanded ? `rounded-b-lg opacity-100 ${node.data.showProMode ? 'max-h-[600px]' : 'max-h-[350px]'} py-3` : 'opacity-0 max-h-0 py-0 border-none rounded-b-lg'}`} style={{ overflow: 'hidden' }}>
         {/* 参考图片预览 - 移到顶部 */}
         {referenceImages.length > 0 && (
           <div className="flex flex-col gap-2 pb-2 border-b border-zinc-800">
@@ -2291,8 +2365,73 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         />
         
         <div className="flex items-center gap-2 mt-1">
-          <NodeSelect value={node.data.model || "svd"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
+          <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
+
+        {/* 专业模式面板 */}
+        {node.data.showProMode && (
+          <div className="flex flex-col gap-3 p-2 bg-zinc-900/50 rounded-lg border border-zinc-800/50 animate-in slide-in-from-top-2 fade-in duration-200">
+            {/* 机位 */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-zinc-500 font-medium">机位</span>
+              <div className="grid grid-cols-5 gap-1">
+                {cameraOptions.map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => handleProModeSelection('camera_pos', opt)}
+                    className={`text-[10px] py-1 rounded transition-colors ${
+                      node.data.camera_pos === opt 
+                        ? 'bg-zinc-100 text-zinc-900 font-medium' 
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            {/* 景别 */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-zinc-500 font-medium">景别</span>
+              <div className="grid grid-cols-3 gap-1">
+                {shotOptions.map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => handleProModeSelection('shot_size', opt)}
+                    className={`text-[10px] py-1 rounded transition-colors ${
+                      node.data.shot_size === opt 
+                        ? 'bg-zinc-100 text-zinc-900 font-medium' 
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 分镜 (Movement) */}
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] text-zinc-500 font-medium">分镜</span>
+              <div className="grid grid-cols-3 gap-1">
+                {movementOptions.map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => handleProModeSelection('camera_move', opt)}
+                    className={`text-[10px] py-1 rounded transition-colors ${
+                      node.data.camera_move === opt 
+                        ? 'bg-zinc-100 text-zinc-900 font-medium' 
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-300'
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         
         <BottomActionBar
           actionButton={
@@ -2328,14 +2467,18 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             options={durationOptions}
             onChange={v => updateNode(node.id, { data: { ...node.data, duration: v } })}
           />
-          <BatchSizeSelector 
-            value={node.data.batchSize || 1} 
-            onChange={v => updateNode(node.id, { data: {...node.data, batchSize: v} })}
-            options={[
-              {value:1,label:"1x"}, 
-              {value:2,label:"2x"}
-            ]}
-          />
+          <button
+            onClick={() => updateNode(node.id, { data: { ...node.data, showProMode: !node.data.showProMode } })}
+            className={`p-1.5 rounded-lg transition-colors flex items-center gap-1 ${
+              node.data.showProMode 
+                ? 'bg-zinc-800 text-zinc-100' 
+                : 'text-zinc-500 hover:bg-zinc-900 hover:text-zinc-300'
+            }`}
+            title="专业模式"
+          >
+            <Sliders size={14} />
+            <span className="text-[10px] font-medium">专业模式</span>
+          </button>
         </BottomActionBar>
       </div>
 
