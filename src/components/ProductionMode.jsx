@@ -324,7 +324,7 @@ export const ProductionMode = ({ projects, onRunProject, apiFunctions }) => {
                     onChange={(v) => handleNodeUpdate(id, { model: v })}
                   />
                 </div>
-                <div className="w-24">
+                <div className="w-20">
                   <label className="text-xs text-zinc-500 mb-1.5 block">比例</label>
                   <NodeSelect 
                     value={data.ratio || "4:3"}

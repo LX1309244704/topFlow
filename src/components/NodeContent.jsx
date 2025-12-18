@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop, Clock, Sliders } from 'lucide-react';
+import { Mountain, Play, Video, Music, FileText, ImageIcon, Wand2, Download, Trash2, Square, Layers, ChevronDown, Sparkles, Search, RefreshCw, LinkIcon, X, Pencil, Brush, Film, Scissors, MonitorPlay, XCircle, CheckCircle, Crop, Clock, Sliders, Pause, Volume2, VolumeX } from 'lucide-react';
 import { Button, NodeSelect, InputBadge } from './UI.jsx';
 import { DrawingCanvas } from './DrawingCanvas.jsx';
 import { FrameCropper } from './FrameCropper.jsx';
@@ -1708,6 +1708,102 @@ export const TextContent = ({ node, updateNode, generateText, generateStreamText
   );
 };
 
+// 自定义简易视频播放器组件
+const SimpleVideoPlayer = ({ src, onTimeUpdate, onLoadedMetadata, videoRef, className, onClick, ...props }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const internalRef = useRef(null);
+  
+  // Use the provided ref or the internal one
+  const playerRef = videoRef || internalRef;
+
+  const togglePlay = (e) => {
+    e.stopPropagation();
+    if (playerRef.current) {
+      if (isPlaying) {
+        playerRef.current.pause();
+      } else {
+        playerRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const toggleMute = (e) => {
+    e.stopPropagation();
+    if (playerRef.current) {
+      playerRef.current.muted = !isMuted;
+      setIsMuted(!isMuted);
+    }
+  };
+
+  // 监听视频实际播放状态变化（包括外部控制导致的暂停/播放）
+  useEffect(() => {
+    const videoEl = playerRef.current;
+    if (!videoEl) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleVolumeChange = () => setIsMuted(videoEl.muted);
+
+    videoEl.addEventListener('play', handlePlay);
+    videoEl.addEventListener('pause', handlePause);
+    videoEl.addEventListener('volumechange', handleVolumeChange);
+
+    return () => {
+      videoEl.removeEventListener('play', handlePlay);
+      videoEl.removeEventListener('pause', handlePause);
+      videoEl.removeEventListener('volumechange', handleVolumeChange);
+    };
+  }, [playerRef]);
+
+  return (
+    <div 
+      className="relative w-full h-full group"
+      onMouseEnter={() => setShowControls(true)}
+      onMouseLeave={() => setShowControls(false)}
+      onClick={onClick}
+    >
+      <video
+        ref={playerRef}
+        src={src}
+        className={className}
+        onTimeUpdate={onTimeUpdate}
+        onLoadedMetadata={onLoadedMetadata}
+        onClick={(e) => {
+           // 阻止点击视频本身触发播放，只允许通过按钮控制
+           // 或者是为了防止拖动节点时误触播放
+           e.stopPropagation(); 
+        }}
+        {...props}
+      />
+      
+      {/* 极简控制栏 - 仅悬浮显示 */}
+      <div 
+        className={`absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full transition-opacity duration-300 ${showControls || isPlaying ? 'opacity-100' : 'opacity-0'}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button 
+          onClick={togglePlay}
+          className="text-white hover:text-zinc-300 transition-colors focus:outline-none"
+        >
+          {isPlaying ? <Pause size={20} fill="currentColor" /> : <Play size={20} fill="currentColor" />}
+        </button>
+        
+        <div className="w-px h-4 bg-white/20"></div>
+        
+        <button 
+          onClick={toggleMute}
+          className="text-white hover:text-zinc-300 transition-colors focus:outline-none"
+        >
+          {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // 视频节点内容组件 - 重新实现，确保上传按钮可见
 export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, videoInputs, generateText, linkedSources }) => {
   const videoModelOptions = [
@@ -2130,15 +2226,15 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
             {/* 有视频时显示视频和操作按钮 */}
             {node.data.videoUrl ? (
               <>
-                <video 
-                  key={node.data.videoUrl} // Force re-render when URL changes to ensure crossOrigin is applied correctly
-                  ref={videoRef}
+                <SimpleVideoPlayer 
+                  key={node.data.videoUrl} // Force re-render when URL changes
+                  videoRef={videoRef}
                   src={node.data.videoUrl} 
-                  controls={!showSceneDirector} // 启用Scene Director时隐藏原生控件
                   className="w-full h-full object-cover" 
                   onTimeUpdate={handleTimeUpdate}
                   onLoadedMetadata={handleLoadedMetadata}
                   crossOrigin="anonymous"
+                  onClick={(e) => e.stopPropagation()} // 防止点击视频区域触发节点的拖拽或其他事件
                 />
                 
                 {/* 截取的帧预览 - 悬浮在右上角 */}
