@@ -298,7 +298,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
             try {
                 const videoUrl = await apiFunctions.generateVideo(
                     promptFromSource || node.data.prompt,
-                    node.data.model || 'sora2',
+                    node.data.model || 'sora-2-all',
                     referenceImages,
                     node.data.ratio || '16:9',
                     node.data.duration || 10
@@ -309,7 +309,7 @@ const NodeCard = React.memo(({ node, updateNode, isSelected, onSelect, onConnect
                     type: 'video',
                     url: videoUrl,
                     prompt: promptFromSource || node.data.prompt,
-                    model: node.data.model || 'sora2',
+                    model: node.data.model || 'sora-2-all',
                     ratio: node.data.ratio || '16:9',
                     metadata: {
                         nodeId: node.id
@@ -1578,8 +1578,8 @@ export default function InfiniteCanvasApp() {
         comicLabels: ["开场镜头", "动作镜头", "反应镜头", "结局镜头"], // 漫画分镜标签
         isSingleGridImage: true, // 标记为单张分镜图
         hidden: true, // 初始隐藏图片，等生成成功后再显示
-        // 为Sora2视频生成准备的完整提示词
-        sora2Prompts: processedDetails.map((detail, index) => ({
+        // 为Sora-2-all视频生成准备的完整提示词
+        sora2AllPrompts: processedDetails.map((detail, index) => ({
           description: detail.description,
           duration: detail.duration,
           prompt: `${detail.description} - 时长：${detail.duration}秒`
@@ -1845,7 +1845,7 @@ export default function InfiniteCanvasApp() {
     const pos = x && y ? { x, y } : { x: (window.innerWidth/2 - offset.x)/scale - 160, y: (window.innerHeight/2 - offset.y)/scale - 100 };
     let initialData = { prompt: "", isGenerating: false };
     if (type === 'image') initialData = { ...initialData, model: "nano-banana", ratio: "4:3", batchSize: 1, aspectRatio: 4/3 };
-    else if (type === 'video') initialData = { ...initialData, model: "sora2", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
+    else if (type === 'video') initialData = { ...initialData, model: "sora-2-all", ratio: "16:9", batchSize: 1, aspectRatio: 16/9 };
     else if (type === 'text') initialData = { text: "", isAnalyzing: false, isWriting: false, height: 350 }; 
     
     const newNode = { id: Date.now(), type, x: pos.x, y: pos.y, data: initialData };
@@ -2455,7 +2455,7 @@ export default function InfiniteCanvasApp() {
     if (type === 'image') {
       data = { ...data, model: "nano-banana", ratio: "4:3", generatedImage: payload.url, aspectRatio: aspectRatio || 4/3 };
     } else {
-      data = { ...data, model: "sora2", ratio: "16:9", generatedVideo: true, videoUrl: payload.url, aspectRatio: aspectRatio || 16/9 };
+      data = { ...data, model: "sora-2-all", ratio: "16:9", generatedVideo: true, videoUrl: payload.url, aspectRatio: aspectRatio || 16/9 };
     }
     const newNode = { id: newId, type, x: cPos.x - 160, y: cPos.y - 100, data };
     handleUpdateWorkflowFixed(prevNodes => [...prevNodes, newNode], es => es);
@@ -2475,7 +2475,7 @@ export default function InfiniteCanvasApp() {
     if (type === 'image') {
       data = { ...data, model: "nano-banana", ratio: "4:3", generatedImage: payload.url, aspectRatio: aspectRatio || 4/3 };
     } else {
-      data = { ...data, model: "sora2", ratio: "16:9", generatedVideo: true, videoUrl: payload.url, aspectRatio: aspectRatio || 16/9 };
+      data = { ...data, model: "sora-2-all", ratio: "16:9", generatedVideo: true, videoUrl: payload.url, aspectRatio: aspectRatio || 16/9 };
     }
     const newNode = { id: newId, type, x: cPos.x - 160, y: cPos.y - 100, data };
     handleUpdateWorkflowFixed(prevNodes => [...prevNodes, newNode], es => es);

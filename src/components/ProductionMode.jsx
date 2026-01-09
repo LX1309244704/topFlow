@@ -20,7 +20,7 @@ const IMAGE_MODEL_OPTIONS = [
 ];
 
 const VIDEO_MODEL_OPTIONS = [
-  { value: "sora2", label: "Sora 2.0" }, 
+  { value: "sora-2-all", label: "Sora 2.0" }, 
   { value: "veo_3_1-fast", label: "veo_3_1-fast" }
 ];
 
@@ -368,7 +368,7 @@ export const ProductionMode = ({ projects, onRunProject, apiFunctions }) => {
                 <div className="flex-1">
                    <label className="text-xs text-zinc-500 mb-1.5 block">模型</label>
                    <NodeSelect 
-                      value={data.model || "sora2"}
+                      value={data.model || "sora-2-all"}
                       options={VIDEO_MODEL_OPTIONS}
                       onChange={(v) => handleNodeUpdate(id, { model: v })}
                    />
@@ -377,7 +377,7 @@ export const ProductionMode = ({ projects, onRunProject, apiFunctions }) => {
                   <label className="text-xs text-zinc-500 mb-1.5 block">时长</label>
                   <NodeSelect 
                     value={data.duration || 10}
-                    options={getDurationOptions(data.model || "sora2")}
+                    options={getDurationOptions(data.model || "sora-2-all")}
                     icon={Clock}
                     onChange={(v) => handleNodeUpdate(id, { duration: parseInt(v) })}
                   />

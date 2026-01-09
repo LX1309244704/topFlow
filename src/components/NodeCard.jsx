@@ -217,7 +217,7 @@ const NodeCard = React.memo(({
 
           const videoUrl = await apiFunctions.generateVideo(
             finalPrompt,
-            node.data.model || 'sora2',
+            node.data.model || 'sora-2-all',
             referenceImages,
             node.data.ratio || '16:9',
             node.data.duration || 10
@@ -227,7 +227,7 @@ const NodeCard = React.memo(({
             type: 'video',
             url: videoUrl,
             prompt: finalPrompt,
-            model: node.data.model || 'sora2',
+            model: node.data.model || 'sora-2-all',
             ratio: node.data.ratio || '16:9',
             metadata: {
               nodeId: node.id,

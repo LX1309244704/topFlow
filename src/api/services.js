@@ -15,7 +15,7 @@ import { generateSong } from './sunoService.js';
 /**
  * 统一视频生成接口，根据模型选择对应的服务
  * @param {string} prompt - 视频生成提示词
- * @param {string} model - 模型名称，支持sora2和veo_3_1-fast
+ * @param {string} model - 模型名称，支持sora-2-all和veo_3_1-fast
  * @param {Array} images - 参考图片数组
  * @param {string} aspectRatio - 视频宽高比
  * @param {number} duration - 视频时长
@@ -25,14 +25,14 @@ export const generateVideo = async (prompt, model, images, aspectRatio, duration
   console.log('统一视频生成接口调用:', { prompt, model, images, aspectRatio, duration });
   
   // 根据模型选择对应的服务
-  if (model === 'sora2') {
+  if (model === 'sora-2-all') {
     return await generateSora2Video(prompt, model, images, aspectRatio, duration);
   } else if (model === 'veo_3_1-fast' || model === 'veo3' || model === 'veo3-fast') {
     // Veo3只支持8秒视频，忽略传入的duration参数
     return await generateVeo3Video(prompt, model, images, aspectRatio, 8);
   } else {
-    // 默认使用Sora2
-    return await generateSora2Video(prompt, 'sora2', images, aspectRatio, duration);
+    // 默认使用sora-2-all
+    return await generateSora2Video(prompt, 'sora-2-all', images, aspectRatio, duration);
   }
 };
 

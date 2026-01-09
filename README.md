@@ -67,7 +67,7 @@ topFlow/
 │   ├── api/               # API服务层
 │   │   ├── client.js      # API客户端
 │   │   ├── geminiService.js    # Gemini文本生成服务
-│   │   ├── sora2Service.js     # Sora视频生成服务
+│   │   ├── sora2Service.js     # Sora视频生成服务 (支持 sora-2-all)
 │   │   ├── sunoService.js      # Suno音乐生成服务
 │   │   ├── ttsService.js       # 语音合成服务
 │   │   └── veo3Service.js      # Veo视频生成服务

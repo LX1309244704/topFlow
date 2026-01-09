@@ -1807,14 +1807,14 @@ const SimpleVideoPlayer = ({ src, onTimeUpdate, onLoadedMetadata, videoRef, clas
 // 视频节点内容组件 - 重新实现，确保上传按钮可见
 export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, textInputLabel, imageInputs, videoInputs, generateText, linkedSources }) => {
   const videoModelOptions = [
-    {value:"sora2",label:"Sora 2.0"}, 
+    {value:"sora-2-all",label:"Sora 2.0"}, 
     {value:"veo_3_1-fast",label:"veo_3_1-fast"}
   ];
   
   // 视频模型限制配置
   const getModelConstraints = (model) => {
     switch(model) {
-      case "sora2": return { maxImages: 1, label: "参考图模式" };
+      case "sora-2-all": return { maxImages: 1, label: "参考图模式" };
       case "veo_3_1-fast": return { maxImages: 2, label: "首尾帧模式" };
       default: return { maxImages: 0, label: "不支持参考图" };
     }
@@ -1822,7 +1822,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
 
   // 视频时长选项
   const durationOptions = React.useMemo(() => {
-    const model = node.data.model || "sora2";
+    const model = node.data.model || "sora-2-all";
     if (model === "veo_3_1-fast") {
       return [{ value: 8, label: "8s" }];
     }
@@ -2183,7 +2183,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
   };
 
   const isDisabled = node.data.isGenerating;
-  const currentModel = node.data.model || "sora2";
+  const currentModel = node.data.model || "sora-2-all";
   const { maxImages } = getModelConstraints(currentModel);
   const activeReferenceImages = referenceImages.slice(0, maxImages);
   
@@ -2198,7 +2198,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
       inputStatusText = '文生视频模式 (T2V)';
       inputStatusColor = 'text-gray-500';
     } else {
-      if (currentModel === 'sora2') {
+      if (currentModel === 'sora-2-all') {
         inputStatusText = '参考图生视频模式 (I2V)';
       } else if (currentModel === 'veo_3_1-fast') {
         inputStatusText = activeReferenceImages.length === 1 ? '首帧生视频模式' : '首尾帧生视频模式';
@@ -2461,7 +2461,7 @@ export const VideoContent = ({ node, updateNode, isExpanded, handleGenerate, tex
         />
         
         <div className="flex items-center gap-2 mt-1">
-          <NodeSelect value={node.data.model || "sora2"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
+          <NodeSelect value={node.data.model || "sora-2-all"} options={videoModelOptions} onChange={v => updateNode(node.id, {data:{...node.data, model: v}})} className="flex-1" />
         </div>
 
         {/* 专业模式面板 */}

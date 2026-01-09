@@ -1,4 +1,4 @@
-// Sora2 视频生成服务接口
+// Sora-2-all 视频生成服务接口
 const API_BASE_URL = 'https://ai.jmyps.com';
 
 /**
@@ -57,7 +57,7 @@ const apiRequest = async (endpoint, data, method = 'POST', headers = {}) => {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('🚫 Sora2 API响应错误:', {
+      console.error('🚫 Sora-2-all API响应错误:', {
         status: response.status,
         statusText: response.statusText,
         errorData
@@ -72,7 +72,7 @@ const apiRequest = async (endpoint, data, method = 'POST', headers = {}) => {
   } catch (error) {
     // 提供更详细的错误信息
     if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-      console.error('🚫 Sora2 API网络连接失败:', {
+      console.error('🚫 Sora-2-all API网络连接失败:', {
         message: error.message,
         url: `${API_BASE_URL}${endpoint}`,
         // 尝试提供一些可能的解决方案
@@ -86,14 +86,14 @@ const apiRequest = async (endpoint, data, method = 'POST', headers = {}) => {
       });
       
       // 创建一个更具描述性的错误
-      const enhancedError = new Error('Sora2 API连接失败，请检查网络连接或稍后重试');
+      const enhancedError = new Error('Sora-2-all API连接失败，请检查网络连接或稍后重试');
       enhancedError.originalError = error;
       enhancedError.isNetworkError = true;
       enhancedError.endpoint = `${API_BASE_URL}${endpoint}`;
       throw enhancedError;
     }
     
-    console.error('Sora2 API请求错误:', error);
+    console.error('Sora-2-all API请求错误:', error);
     throw error;
   }
 };
@@ -128,13 +128,13 @@ const apiRequestWithRetry = async (endpoint, data, method = 'POST', retries = 3,
       if (i < retries - 1 && (isNetworkError || isRetryableStatus || isHeavyLoad)) {
         // 指数退避策略
         const delay = Math.pow(2, i) * 1000;
-        console.log(`Sora2 API请求失败 (重试 ${i+1}/${retries}):`, error.message);
+        console.log(`Sora-2-all API请求失败 (重试 ${i+1}/${retries}):`, error.message);
         await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         // 其他错误直接抛出
         // 如果是最后一次重试且是网络错误，提供额外的诊断信息
         if (i === retries - 1 && (isNetworkError || isRetryableStatus || isHeavyLoad)) {
-          console.error('🚫 Sora2 API所有重试均失败，可能是网络或服务器问题:', {
+          console.error('🚫 Sora-2-all API所有重试均失败，可能是网络或服务器问题:', {
             endpoint: `${API_BASE_URL}${endpoint}`,
             originalError: error.originalError || error.message
           });
@@ -168,17 +168,17 @@ const getOrientationAndSize = (aspectRatio) => {
 };
 
 /**
- * Sora2视频生成API
+ * Sora-2-all视频生成API
  * @param {string} prompt - 视频生成提示词
- * @param {string} model - 模型名称，默认为sora2
+ * @param {string} model - 模型名称，默认为sora-2-all
  * @param {Array} images - 参考图片数组
  * @param {string} aspectRatio - 视频宽高比，默认为16:9
  * @param {number} duration - 视频时长，默认为15秒
  * @returns {Promise<string>} 视频URL
  */
-export const generateSora2Video = async (prompt, model = 'sora2', images = [], aspectRatio = '16:9', duration = 15) => {
+export const generateSora2Video = async (prompt, model = 'sora-2-all', images = [], aspectRatio = '16:9', duration = 15) => {
   // 添加调试日志，查看传入的参数
-  console.log('Sora2视频生成参数:', { prompt, model, images, aspectRatio, duration });
+  console.log('Sora-2-all视频生成参数:', { prompt, model, images, aspectRatio, duration });
   
   const maxGlobalRetries = 3;
   let globalAttempts = 0;
@@ -189,10 +189,10 @@ export const generateSora2Video = async (prompt, model = 'sora2', images = [], a
     try {
       const { orientation, size } = getOrientationAndSize(aspectRatio);
       
-      // 构建请求参数，按照Sora2 API规范
+      // 构建请求参数，按照Sora-2-all API规范
       const requestData = {
         images: images,
-        model: model === 'sora2' ? 'sora-2' : model, // Sora2模型名称为sora-2
+        model: model === 'sora-2-all' ? 'sora-2-all' : model, // Sora-2-all模型名称为sora-2-all
         orientation: orientation,
         prompt: prompt || '',
         size: size,

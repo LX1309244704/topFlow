@@ -81,8 +81,8 @@ const QuickCreatePanel = ({ onAddNode, generateText }) => {
 
   // 视频节点参数配置
   const videoParams = {
-    model: { value: 'sora2', options: [
-      { value: 'sora2', label: 'Sora 2.0' },
+    model: { value: 'sora-2-all', options: [
+      { value: 'sora-2-all', label: 'Sora 2.0' },
       { value: 'veo_3_1-fast', label: 'veo_3_1-fast' }
     ]},
     ratio: { value: '16:9', options: [

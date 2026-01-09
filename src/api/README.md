@@ -9,17 +9,18 @@ src/api/
 ├── README.md                 # 本文档
 ├── client.js                 # 统一API客户端接口（向后兼容）
 ├── services.js               # 统一服务接口层
-├── sora2Service.js           # Sora2视频生成服务
+├── sora2Service.js           # Sora-2-all视频生成服务
 ├── veo3Service.js            # Veo3视频生成服务
 ├── geminiService.js          # Gemini AI服务（文本、图像、剧本分析）
-└── ttsService.js             # 语音合成服务
+├── ttsService.js             # 语音合成服务
+└── sunoService.js            # Suno音乐生成服务
 ```
 
 ## 各服务说明
 
-### 1. Sora2视频生成服务 (sora2Service.js)
+### 1. Sora-2-all视频生成服务 (sora2Service.js)
 
-负责处理Sora2模型的视频生成请求，包括：
+负责处理Sora-2-all模型的视频生成请求，包括：
 - 视频任务创建
 - 任务状态轮询
 - 视频结果获取
@@ -30,10 +31,10 @@ import { generateSora2Video } from './api/sora2Service.js';
 
 const videoUrl = await generateSora2Video(
   prompt,        // 视频生成提示词
-  model,         // 模型名称，默认为sora2
+  model,         // 模型名称，默认为sora-2-all
   images,        // 参考图片数组
   aspectRatio,   // 视频宽高比，默认为16:9
-  duration       // 视频时长，默认为10秒
+  duration       // 视频时长，默认为15秒
 );
 ```
 
@@ -129,7 +130,7 @@ import {
 // 统一视频生成接口，根据模型自动选择服务
 const videoUrl = await generateVideo(
   prompt,
-  model,      // 支持sora2和veo_3_1-fast
+  model,      // 支持sora-2-all和veo_3_1-fast
   images,
   aspectRatio,
   duration
